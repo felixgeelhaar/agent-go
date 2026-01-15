@@ -2,11 +2,15 @@
 package api
 
 import (
+	"time"
+
+	"github.com/felixgeelhaar/agent-go/domain/cache"
 	"github.com/felixgeelhaar/agent-go/domain/ledger"
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	inframw "github.com/felixgeelhaar/agent-go/infrastructure/middleware"
+	"github.com/felixgeelhaar/agent-go/infrastructure/storage/memory"
 )
 
 // Re-export middleware types for convenience.
@@ -26,8 +30,12 @@ type (
 	// MiddlewareRegistry manages an ordered list of middleware.
 	MiddlewareRegistry = middleware.Registry
 
-	// Cache provides in-memory caching for tool results.
-	MiddlewareCache = inframw.Cache
+	// Cache is the interface for tool result caching.
+	Cache = cache.Cache
+
+	// LegacyMiddlewareCache provides in-memory caching for tool results.
+	// Deprecated: Use Cache interface with NewMemoryCache instead.
+	LegacyMiddlewareCache = inframw.LegacyCache
 )
 
 // NewMiddlewareRegistry creates a new middleware registry.
@@ -35,9 +43,15 @@ func NewMiddlewareRegistry() *MiddlewareRegistry {
 	return middleware.NewRegistry()
 }
 
-// NewMiddlewareCache creates a new cache with the specified maximum entries.
-func NewMiddlewareCache(maxEntries int) *MiddlewareCache {
-	return inframw.NewCache(maxEntries)
+// NewMemoryCache creates a new in-memory cache with the specified maximum entries.
+func NewMemoryCache(maxEntries int) *memory.Cache {
+	return memory.NewCache(memory.WithMaxSize(maxEntries))
+}
+
+// NewLegacyMiddlewareCache creates a new cache with the specified maximum entries.
+// Deprecated: Use NewMemoryCache instead.
+func NewLegacyMiddlewareCache(maxEntries int) *LegacyMiddlewareCache {
+	return inframw.NewLegacyCache(maxEntries)
 }
 
 // ChainMiddleware composes multiple middleware into a single middleware.
@@ -105,8 +119,27 @@ func LoggingMiddleware(cfg *LoggingMiddlewareConfig) Middleware {
 
 // CachingMiddleware returns middleware that caches cacheable tool results.
 // Only tools marked as cacheable (via annotations) will be cached.
-func CachingMiddleware(cache *MiddlewareCache) Middleware {
-	return inframw.Caching(cache)
+// Accepts any cache.Cache implementation (memory, Redis, etc).
+func CachingMiddleware(c Cache, opts ...CacheOption) Middleware {
+	var mwOpts []inframw.CacheOption
+	for _, opt := range opts {
+		mwOpts = append(mwOpts, inframw.CacheOption(opt))
+	}
+	return inframw.Caching(c, mwOpts...)
+}
+
+// CacheOption configures the caching middleware.
+type CacheOption = inframw.CacheOption
+
+// WithCacheTTL sets the cache TTL for cached entries.
+func WithCacheTTL(ttl time.Duration) CacheOption {
+	return inframw.WithCacheTTL(ttl)
+}
+
+// LegacyCachingMiddleware returns middleware using the deprecated LegacyCache.
+// Deprecated: Use CachingMiddleware with Cache interface instead.
+func LegacyCachingMiddleware(legacyCache *LegacyMiddlewareCache) Middleware {
+	return inframw.LegacyCaching(legacyCache)
 }
 
 // LedgerRecordingMiddleware returns middleware that records tool calls to the ledger.

@@ -4,29 +4,34 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"sync"
+	"time"
 
+	"github.com/felixgeelhaar/agent-go/domain/cache"
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 )
 
-// Cache provides in-memory caching for tool results.
-type Cache struct {
+// LegacyCache provides in-memory caching for tool results.
+// Deprecated: Use cache.Cache implementations instead.
+type LegacyCache struct {
 	entries map[string]tool.Result
 	mu      sync.RWMutex
 	maxSize int
 }
 
-// NewCache creates a new cache with the specified maximum entries.
-func NewCache(maxEntries int) *Cache {
-	return &Cache{
+// NewLegacyCache creates a new legacy cache with the specified maximum entries.
+// Deprecated: Use NewCache from infrastructure/storage/memory instead.
+func NewLegacyCache(maxEntries int) *LegacyCache {
+	return &LegacyCache{
 		entries: make(map[string]tool.Result),
 		maxSize: maxEntries,
 	}
 }
 
 // Get retrieves a cached result by key.
-func (c *Cache) Get(key string) (tool.Result, bool) {
+func (c *LegacyCache) Get(key string) (tool.Result, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	result, ok := c.entries[key]
@@ -34,7 +39,7 @@ func (c *Cache) Get(key string) (tool.Result, bool) {
 }
 
 // Set stores a result in the cache.
-func (c *Cache) Set(key string, result tool.Result) {
+func (c *LegacyCache) Set(key string, result tool.Result) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.entries) < c.maxSize {
@@ -43,26 +48,49 @@ func (c *Cache) Set(key string, result tool.Result) {
 }
 
 // Clear removes all entries from the cache.
-func (c *Cache) Clear() {
+func (c *LegacyCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries = make(map[string]tool.Result)
 }
 
 // Len returns the number of cached entries.
-func (c *Cache) Len() int {
+func (c *LegacyCache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.entries)
 }
 
-// Caching returns middleware that caches cacheable tool results.
-// Only tools marked as cacheable (via annotations) will be cached.
-func Caching(cache *Cache) middleware.Middleware {
+// CacheOptions configures caching behavior.
+type CacheOptions struct {
+	// TTL is the time-to-live for cached entries.
+	TTL time.Duration
+}
+
+// CacheOption configures the caching middleware.
+type CacheOption func(*CacheOptions)
+
+// WithCacheTTL sets the cache TTL.
+func WithCacheTTL(ttl time.Duration) CacheOption {
+	return func(o *CacheOptions) {
+		o.TTL = ttl
+	}
+}
+
+// Caching returns middleware that caches cacheable tool results using the cache.Cache interface.
+// This works with any cache implementation (memory, Redis, etc).
+func Caching(c cache.Cache, opts ...CacheOption) middleware.Middleware {
+	options := CacheOptions{
+		TTL: 0, // No expiration by default
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	return func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, execCtx *middleware.ExecutionContext) (tool.Result, error) {
 			// Skip if cache not provided
-			if cache == nil {
+			if c == nil {
 				return next(ctx, execCtx)
 			}
 
@@ -75,7 +103,53 @@ func Caching(cache *Cache) middleware.Middleware {
 			key := cacheKey(execCtx.Tool.Name(), execCtx.Input)
 
 			// Check cache
-			if result, ok := cache.Get(key); ok {
+			data, ok, err := c.Get(ctx, key)
+			if err == nil && ok {
+				var result tool.Result
+				if err := json.Unmarshal(data, &result); err == nil {
+					result.Cached = true
+					return result, nil
+				}
+			}
+
+			// Execute
+			result, err := next(ctx, execCtx)
+			if err != nil {
+				return result, err
+			}
+
+			// Store in cache
+			data, err = json.Marshal(result)
+			if err == nil {
+				setOpts := cache.SetOptions{TTL: options.TTL}
+				_ = c.Set(ctx, key, data, setOpts)
+			}
+
+			return result, nil
+		}
+	}
+}
+
+// LegacyCaching returns middleware using the deprecated LegacyCache.
+// Deprecated: Use Caching with cache.Cache instead.
+func LegacyCaching(legacyCache *LegacyCache) middleware.Middleware {
+	return func(next middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, execCtx *middleware.ExecutionContext) (tool.Result, error) {
+			// Skip if cache not provided
+			if legacyCache == nil {
+				return next(ctx, execCtx)
+			}
+
+			// Only cache if tool is cacheable
+			if !execCtx.Tool.Annotations().CanCache() {
+				return next(ctx, execCtx)
+			}
+
+			// Generate cache key
+			key := cacheKey(execCtx.Tool.Name(), execCtx.Input)
+
+			// Check cache
+			if result, ok := legacyCache.Get(key); ok {
 				result.Cached = true
 				return result, nil
 			}
@@ -87,7 +161,7 @@ func Caching(cache *Cache) middleware.Middleware {
 			}
 
 			// Store in cache
-			cache.Set(key, result)
+			legacyCache.Set(key, result)
 
 			return result, nil
 		}
