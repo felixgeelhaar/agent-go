@@ -1,0 +1,287 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a **state-driven agent runtime** for Go that enables developers to build trustworthy, adaptable AI-powered systems by designing the structure and constraints of agent behavior rather than scripting intelligence with prompts.
+
+Key principle: **Trust is the product.** Intelligence is constrained by design, not hope.
+
+### External Libraries
+
+- **[statekit](https://github.com/felixgeelhaar/statekit)** - Statechart execution engine with hierarchical states, guards, actions, and XState JSON export
+- **[fortify](https://github.com/felixgeelhaar/fortify)** - Resilience patterns (circuit breaker, retry, rate limiter, bulkhead, timeout)
+- **[bolt](https://github.com/felixgeelhaar/bolt)** - High-performance zero-allocation structured logging with OpenTelemetry support
+
+## Development Commands
+
+```bash
+# Build
+make build                    # Build all packages
+go build ./...
+
+# Test
+make test                     # Run tests with race detection
+make test-coverage            # Run tests with coverage profile
+go test -race -v ./...
+
+# Coverage (coverctl)
+make coverage-check           # Check coverage threshold (80%)
+make coverage-report          # Generate detailed report
+make coverage-debt            # Show coverage debt by domain
+coverctl check --fail-under=80
+
+# Security (verdict)
+make security                 # Run all security scans
+make security-sast            # Static analysis security testing
+make security-vuln            # Vulnerability scanning
+make security-secrets         # Secret detection
+verdict scan --path=.
+
+# Release (relicta)
+make release-plan             # Analyze commits, suggest version
+make release-bump             # Calculate and set version
+make release-notes            # Generate release notes
+make release-publish          # Execute release
+relicta plan --analyze
+
+# Lint
+make lint                     # Run golangci-lint
+golangci-lint run ./...
+
+# Run example
+make example                  # Run fileops example
+go run ./example/fileops
+
+# All CI checks
+make check                    # lint + test + coverage + security
+```
+
+## Architecture
+
+### Domain-Driven Design Structure
+
+```
+agent-go/
+├── domain/                         # Core Domain Layer (no external deps)
+│   ├── agent/                      # Agent Aggregate Root
+│   │   ├── state.go                # Canonical states with semantics
+│   │   ├── decision.go             # Planner decision value objects
+│   │   ├── run.go                  # Run aggregate root
+│   │   ├── evidence.go             # Evidence value object
+│   │   └── errors.go               # Domain errors
+│   │
+│   ├── tool/                       # Tool Aggregate
+│   │   ├── tool.go                 # Tool interface and builder
+│   │   ├── annotation.go           # Tool annotations (ReadOnly, Destructive)
+│   │   ├── schema.go               # Input/Output schema value object
+│   │   ├── result.go               # ToolResult value object
+│   │   ├── registry.go             # Tool repository interface
+│   │   └── errors.go               # Tool domain errors
+│   │
+│   ├── policy/                     # Policy Subdomain
+│   │   ├── budget.go               # Budget tracking with thread safety
+│   │   ├── approval.go             # Approval interfaces and implementations
+│   │   ├── constraint.go           # Tool eligibility, state transitions
+│   │   └── errors.go               # Policy errors
+│   │
+│   ├── ledger/                     # Audit Subdomain
+│   │   ├── ledger.go               # Ledger aggregate
+│   │   ├── entry.go                # LedgerEntry value object
+│   │   └── events.go               # Domain events
+│   │
+│   └── artifact/                   # Artifact Subdomain
+│       ├── artifact.go             # ArtifactRef value object
+│       └── store.go                # ArtifactStore repository interface
+│
+├── application/                    # Application Layer (orchestration)
+│   ├── engine.go                   # Main orchestration service
+│   └── options.go                  # Functional options
+│
+├── infrastructure/                 # Infrastructure Layer
+│   ├── statemachine/               # Statekit integration
+│   │   ├── machine.go              # Agent state machine definition
+│   │   ├── guards.go               # Transition guards
+│   │   ├── actions.go              # State entry/exit actions
+│   │   └── interpreter.go          # State machine interpreter
+│   │
+│   ├── resilience/                 # Fortify integration
+│   │   ├── executor.go             # Resilient tool executor
+│   │   └── options.go              # Executor configuration
+│   │
+│   ├── logging/                    # Bolt integration
+│   │   ├── logger.go               # Logger factory
+│   │   └── fields.go               # Structured field helpers
+│   │
+│   ├── storage/                    # Storage implementations
+│   │   ├── memory/                 # In-memory stores
+│   │   │   └── tool_registry.go
+│   │   └── filesystem/             # Filesystem stores
+│   │       └── artifact_store.go
+│   │
+│   └── planner/                    # Planner implementations
+│       ├── mock.go                 # MockPlanner for testing
+│       └── scripted.go             # ScriptedPlanner for deterministic tests
+│
+├── interfaces/                     # Interface Adapters
+│   └── api/                        # Public API
+│       ├── agent.go                # Engine constructor, options, re-exports
+│       └── builders.go             # Helper constructors
+│
+├── test/                           # Test suites
+│   └── invariant_test.go           # 8 design invariant tests
+│
+└── example/
+    └── fileops/                    # Canonical example
+        ├── main.go                 # Example runner
+        ├── tools.go                # File operation tools
+        └── README.md
+```
+
+### State Machine
+
+The agent operates within a canonical state graph:
+
+| State    | Purpose                | Side Effects | Terminal |
+|----------|------------------------|--------------|----------|
+| intake   | Normalize goal         | No           | No       |
+| explore  | Gather evidence        | No           | No       |
+| decide   | Choose next step       | No           | No       |
+| act      | Perform side-effects   | **Yes**      | No       |
+| validate | Confirm outcome        | No           | No       |
+| done     | Terminal success       | No           | Yes      |
+| failed   | Terminal failure       | No           | Yes      |
+
+States are **structural constraints**, not behavioral definitions. Tools are explicitly allowed or denied per state.
+
+### Planner Contract
+
+**Input**: State, Evidence, Allowed tools, Budgets, Variables
+
+**Output** (one of):
+- `CallTool` - Execute a tool with JSON input
+- `Transition` - Move to another state with reason
+- `AskHuman` - Request human input (not yet implemented)
+- `Finish` - Complete successfully with result
+- `Fail` - Terminate with failure
+
+**Guarantees**: Bounded outputs, no side effects, conservative bias, deterministic mode available.
+
+### Tool System
+
+Tools have:
+- Stable string identifier
+- Input/Output JSON schemas
+- Annotations: `ReadOnly`, `Destructive`, `Idempotent`, `Cacheable`, risk level
+- Handler function with context
+- Optional artifact emission
+
+Annotations influence:
+- Planner scoring
+- Policy enforcement (approval requirements)
+- Resilience behavior (retry for idempotent)
+- Caching eligibility
+
+### Resilient Execution
+
+Tool execution uses a composition of resilience patterns via Fortify:
+
+```
+Bulkhead → Timeout → Circuit Breaker → Retry (if idempotent)
+```
+
+Configured via `resilience.Executor`:
+- Bulkhead limits concurrent tool executions
+- Timeout prevents long-running tools
+- Circuit breaker prevents cascading failures
+- Retry with exponential backoff for idempotent tools
+
+### Storage Capabilities (All Optional)
+
+- **ToolRegistry**: In-memory tool registration
+- **ArtifactStore**: Large outputs with stable references
+- **Ledger**: Append-only audit log for all operations
+
+## Design Invariants
+
+These must hold in all code paths and tests:
+
+1. **Tool eligibility** - Tools only run in explicitly allowed states
+2. **Transition validity** - State changes follow the defined graph
+3. **Approval enforcement** - Destructive actions require approval
+4. **Budget enforcement** - Limits are never exceeded
+5. **State semantics** - Only Act state allows side effects
+6. **Tool registration uniqueness** - Tool names are unique per registry
+7. **Run lifecycle** - Runs progress through states to terminal state
+8. **Evidence accumulation** - Evidence is append-only, order preserved
+
+## Testing Philosophy
+
+- **Deterministic execution mode** required for all core logic
+- **Testable without LLMs** - use `MockPlanner` or `ScriptedPlanner`
+- **No required external services** - storage is always optional
+- **Explicit failure modes** - no silent recovery
+- **Invariant-driven test suite** - verify the 8 invariants above
+
+```go
+// Example: ScriptedPlanner for deterministic testing
+planner := api.NewScriptedPlanner(
+    api.ScriptStep{
+        ExpectState: agent.StateIntake,
+        Decision:    api.NewTransitionDecision(agent.StateExplore, "begin"),
+    },
+    api.ScriptStep{
+        ExpectState: agent.StateExplore,
+        Decision:    api.NewCallToolDecision("read_file", input, "gather info"),
+    },
+    api.ScriptStep{
+        ExpectState: agent.StateExplore,
+        Decision:    api.NewFinishDecision("done", result),
+    },
+)
+```
+
+## Public API Usage
+
+```go
+import api "github.com/felixgeelhaar/agent-go/interfaces/api"
+
+// Create tool
+tool := api.NewToolBuilder("read_file").
+    WithDescription("Reads a file").
+    WithAnnotations(api.Annotations{ReadOnly: true}).
+    WithExecutor(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
+        // Implementation
+    }).
+    Build()
+
+// Create registry
+registry := api.NewToolRegistry()
+registry.Register(tool)
+
+// Configure eligibility
+eligibility := api.NewToolEligibility()
+eligibility.Allow(api.StateExplore, "read_file")
+
+// Create engine
+engine, err := api.New(
+    api.WithRegistry(registry),
+    api.WithPlanner(myPlanner),
+    api.WithToolEligibility(eligibility),
+    api.WithTransitions(api.DefaultTransitions()),
+    api.WithBudgets(map[string]int{"tool_calls": 100}),
+    api.WithMaxSteps(50),
+)
+
+// Run agent
+run, err := engine.Run(ctx, "Process the data files")
+```
+
+## Explicit Non-Goals
+
+- Multi-agent orchestration
+- Dynamic state creation by LLMs
+- UI dashboards
+- Model-specific abstractions
+- Prompt-only experimentation

@@ -1,0 +1,355 @@
+// Package application provides the application layer for the agent runtime.
+package application
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/felixgeelhaar/agent-go/domain/agent"
+	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/ledger"
+	"github.com/felixgeelhaar/agent-go/domain/policy"
+	"github.com/felixgeelhaar/agent-go/domain/tool"
+	"github.com/felixgeelhaar/agent-go/infrastructure/logging"
+	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
+	"github.com/felixgeelhaar/agent-go/infrastructure/resilience"
+	"github.com/felixgeelhaar/agent-go/infrastructure/statemachine"
+)
+
+// Engine is the main orchestration service for agent execution.
+type Engine struct {
+	registry    tool.Registry
+	planner     planner.Planner
+	executor    *resilience.Executor
+	artifacts   artifact.Store
+	eligibility *policy.ToolEligibility
+	transitions *policy.StateTransitions
+	approver    policy.Approver
+	budgetLimits map[string]int
+	maxSteps    int
+}
+
+// EngineConfig contains configuration for the engine.
+type EngineConfig struct {
+	Registry     tool.Registry
+	Planner      planner.Planner
+	Executor     *resilience.Executor
+	Artifacts    artifact.Store
+	Eligibility  *policy.ToolEligibility
+	Transitions  *policy.StateTransitions
+	Approver     policy.Approver
+	BudgetLimits map[string]int
+	MaxSteps     int
+}
+
+// NewEngine creates a new engine with the given configuration.
+func NewEngine(config EngineConfig) (*Engine, error) {
+	if config.Registry == nil {
+		return nil, errors.New("registry is required")
+	}
+	if config.Planner == nil {
+		return nil, errors.New("planner is required")
+	}
+
+	e := &Engine{
+		registry:     config.Registry,
+		planner:      config.Planner,
+		executor:     config.Executor,
+		artifacts:    config.Artifacts,
+		eligibility:  config.Eligibility,
+		transitions:  config.Transitions,
+		approver:     config.Approver,
+		budgetLimits: config.BudgetLimits,
+		maxSteps:     config.MaxSteps,
+	}
+
+	// Set defaults
+	if e.executor == nil {
+		e.executor = resilience.NewDefaultExecutor()
+	}
+	if e.eligibility == nil {
+		e.eligibility = policy.NewToolEligibility()
+	}
+	if e.transitions == nil {
+		e.transitions = policy.DefaultTransitions()
+	}
+	if e.maxSteps == 0 {
+		e.maxSteps = 100
+	}
+
+	return e, nil
+}
+
+// Run executes the agent with the given goal.
+func (e *Engine) Run(ctx context.Context, goal string) (*agent.Run, error) {
+	return e.RunWithVars(ctx, goal, nil)
+}
+
+// RunWithVars executes the agent with the given goal and initial variables.
+func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]any) (*agent.Run, error) {
+	// Generate run ID
+	runID := generateRunID()
+
+	// Create run
+	run := agent.NewRun(runID, goal)
+	if vars != nil {
+		for k, v := range vars {
+			run.SetVar(k, v)
+		}
+	}
+
+	// Create supporting components
+	budget := policy.NewBudget(e.budgetLimits)
+	runLedger := ledger.New(runID)
+
+	// Create state machine context
+	machineCtx := statemachine.NewContext(run, budget, runLedger)
+	machineCtx.Eligibility = e.eligibility
+	machineCtx.Transitions = e.transitions
+
+	// Create state machine
+	machine, err := statemachine.NewAgentMachine()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state machine: %w", err)
+	}
+
+	// Create interpreter
+	interp := statemachine.NewInterpreter(machine, machineCtx)
+
+	// Log run start
+	logging.Info().
+		Add(logging.RunID(runID)).
+		Add(logging.Goal(goal)).
+		Msg("run started")
+
+	// Start state machine
+	interp.Start()
+	runLedger.RecordRunStarted(goal)
+
+	// Execute until terminal state or max steps
+	steps := 0
+	for !interp.IsTerminal() && steps < e.maxSteps {
+		select {
+		case <-ctx.Done():
+			run.Fail("context cancelled")
+			runLedger.RecordRunFailed(run.CurrentState, "context cancelled")
+			return run, ctx.Err()
+		default:
+		}
+
+		if err := e.step(ctx, interp, machineCtx); err != nil {
+			run.Fail(err.Error())
+			runLedger.RecordRunFailed(run.CurrentState, err.Error())
+
+			logging.Error().
+				Add(logging.RunID(runID)).
+				Add(logging.State(run.CurrentState)).
+				Add(logging.ErrorField(err)).
+				Msg("run failed")
+
+			return run, err
+		}
+		steps++
+	}
+
+	if steps >= e.maxSteps && !interp.IsTerminal() {
+		run.Fail("max steps exceeded")
+		runLedger.RecordRunFailed(run.CurrentState, "max steps exceeded")
+		return run, errors.New("max steps exceeded")
+	}
+
+	// Log completion
+	logging.Info().
+		Add(logging.RunID(runID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.Duration(run.Duration())).
+		Msg("run completed")
+
+	if run.Status == agent.RunStatusCompleted {
+		runLedger.RecordRunCompleted(run.Result)
+	}
+
+	return run, nil
+}
+
+// step executes a single step of the agent.
+func (e *Engine) step(ctx context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context) error {
+	run := machineCtx.Run
+	runLedger := machineCtx.Ledger
+
+	// Get allowed tools for current state
+	allowedTools := interp.AllowedTools()
+
+	// Request decision from planner
+	req := planner.PlanRequest{
+		RunID:        run.ID,
+		CurrentState: run.CurrentState,
+		Evidence:     run.Evidence,
+		AllowedTools: allowedTools,
+		Budgets:      machineCtx.Budget.Snapshot(),
+		Vars:         run.Vars,
+	}
+
+	decision, err := e.planner.Plan(ctx, req)
+	if err != nil {
+		return fmt.Errorf("planner error: %w", err)
+	}
+
+	// Record decision
+	runLedger.RecordDecision(run.CurrentState, decision)
+
+	logging.Debug().
+		Add(logging.RunID(run.ID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.Decision(decision.Type)).
+		Msg("planner decision")
+
+	// Execute decision
+	switch decision.Type {
+	case agent.DecisionCallTool:
+		return e.executeToolDecision(ctx, interp, machineCtx, decision.CallTool)
+	case agent.DecisionTransition:
+		return e.executeTransition(ctx, interp, decision.Transition)
+	case agent.DecisionAskHuman:
+		return e.executeAskHuman(ctx, interp, machineCtx, decision.AskHuman)
+	case agent.DecisionFinish:
+		return e.executeFinish(ctx, interp, machineCtx, decision.Finish)
+	case agent.DecisionFail:
+		return e.executeFail(ctx, interp, machineCtx, decision.Fail)
+	default:
+		return fmt.Errorf("unknown decision type: %s", decision.Type)
+	}
+}
+
+// executeToolDecision executes a tool call decision.
+func (e *Engine) executeToolDecision(ctx context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.CallToolDecision) error {
+	run := machineCtx.Run
+	runLedger := machineCtx.Ledger
+	budget := machineCtx.Budget
+
+	// Check tool eligibility
+	if !interp.IsToolAllowed(decision.ToolName) {
+		return fmt.Errorf("%w: %s in state %s", tool.ErrToolNotAllowed, decision.ToolName, run.CurrentState)
+	}
+
+	// Get tool
+	t, ok := e.registry.Get(decision.ToolName)
+	if !ok {
+		return fmt.Errorf("%w: %s", tool.ErrToolNotFound, decision.ToolName)
+	}
+
+	// Check budget
+	if !budget.CanConsume("tool_calls", 1) {
+		runLedger.RecordBudgetExhausted(run.CurrentState, "tool_calls")
+		return policy.ErrBudgetExceeded
+	}
+
+	// Check approval for destructive tools
+	if t.Annotations().ShouldRequireApproval() {
+		if e.approver == nil {
+			return tool.ErrApprovalRequired
+		}
+
+		runLedger.RecordApprovalRequest(run.CurrentState, decision.ToolName, decision.Input, t.Annotations().RiskLevel.String())
+
+		resp, err := e.approver.Approve(ctx, policy.ApprovalRequest{
+			RunID:     run.ID,
+			ToolName:  decision.ToolName,
+			Input:     decision.Input,
+			Reason:    decision.Reason,
+			RiskLevel: t.Annotations().RiskLevel.String(),
+			Timestamp: time.Now(),
+		})
+		if err != nil {
+			return fmt.Errorf("approval error: %w", err)
+		}
+
+		runLedger.RecordApprovalResult(run.CurrentState, decision.ToolName, resp.Approved, resp.Approver, resp.Reason)
+
+		if !resp.Approved {
+			return tool.ErrApprovalDenied
+		}
+	}
+
+	// Record tool call
+	runLedger.RecordToolCall(run.CurrentState, decision.ToolName, decision.Input)
+
+	logging.Info().
+		Add(logging.RunID(run.ID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.ToolName(decision.ToolName)).
+		Msg("executing tool")
+
+	// Execute tool with resilience
+	result, err := e.executor.Execute(ctx, t, decision.Input)
+
+	// Record result or error
+	if err != nil {
+		runLedger.RecordToolError(run.CurrentState, decision.ToolName, err)
+		logging.Error().
+			Add(logging.RunID(run.ID)).
+			Add(logging.ToolName(decision.ToolName)).
+			Add(logging.ErrorField(err)).
+			Msg("tool execution failed")
+		return fmt.Errorf("tool execution failed: %w", err)
+	}
+
+	// Consume budget (already validated with CanConsume above)
+	budget.Consume("tool_calls", 1) // #nosec G104 -- validated by CanConsume check above
+	runLedger.RecordBudgetConsumed(run.CurrentState, "tool_calls", 1, budget.Remaining("tool_calls"))
+	runLedger.RecordToolResult(run.CurrentState, decision.ToolName, result.Output, result.Duration, result.Cached)
+
+	logging.Info().
+		Add(logging.RunID(run.ID)).
+		Add(logging.ToolName(decision.ToolName)).
+		Add(logging.Duration(result.Duration)).
+		Add(logging.Cached(result.Cached)).
+		Msg("tool executed")
+
+	// Add evidence
+	run.AddEvidence(agent.NewToolEvidence(decision.ToolName, result.Output))
+
+	return nil
+}
+
+// executeTransition executes a state transition decision.
+func (e *Engine) executeTransition(_ context.Context, interp *statemachine.Interpreter, decision *agent.TransitionDecision) error {
+	return interp.Transition(decision.ToState, decision.Reason)
+}
+
+// executeAskHuman handles human input requests.
+func (e *Engine) executeAskHuman(_ context.Context, _ *statemachine.Interpreter, _ *statemachine.Context, _ *agent.AskHumanDecision) error {
+	// For now, human input is not implemented
+	return errors.New("human input not implemented")
+}
+
+// executeFinish completes the run successfully.
+func (e *Engine) executeFinish(_ context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FinishDecision) error {
+	run := machineCtx.Run
+	// Transition first, then mark complete (order matters - transition checks current state)
+	if err := interp.Transition(agent.StateDone, decision.Summary); err != nil {
+		return err
+	}
+	run.Result = decision.Result
+	run.Status = agent.RunStatusCompleted
+	return nil
+}
+
+// executeFail terminates the run with failure.
+func (e *Engine) executeFail(_ context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FailDecision) error {
+	run := machineCtx.Run
+	// Transition first, then mark failed (order matters - transition checks current state)
+	if err := interp.Transition(agent.StateFailed, decision.Reason); err != nil {
+		return err
+	}
+	run.Error = decision.Reason
+	run.Status = agent.RunStatusFailed
+	return nil
+}
+
+// generateRunID creates a unique run ID.
+func generateRunID() string {
+	return fmt.Sprintf("run-%d", time.Now().UnixNano())
+}
