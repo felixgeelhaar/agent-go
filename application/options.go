@@ -2,6 +2,7 @@ package application
 
 import (
 	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
@@ -71,6 +72,17 @@ func WithBudgets(limits map[string]int) Option {
 func WithMaxSteps(n int) Option {
 	return func(c *EngineConfig) {
 		c.MaxSteps = n
+	}
+}
+
+// WithMiddleware sets a custom middleware registry.
+// If not set, the engine uses a default middleware chain with:
+// - Eligibility middleware (tool access control per state)
+// - Approval middleware (human approval for destructive tools)
+// - Logging middleware (execution timing and results)
+func WithMiddleware(m *middleware.Registry) Option {
+	return func(c *EngineConfig) {
+		c.Middleware = m
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/felixgeelhaar/agent-go/application"
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
@@ -83,6 +84,7 @@ func New(opts ...Option) (*Engine, error) {
 		Approver:     config.approver,
 		BudgetLimits: config.budgets,
 		MaxSteps:     config.maxSteps,
+		Middleware:   config.middleware,
 	}
 
 	engine, err := application.NewEngine(appConfig)
@@ -114,6 +116,7 @@ type engineConfig struct {
 	approver    policy.Approver
 	budgets     map[string]int
 	maxSteps    int
+	middleware  *middleware.Registry
 }
 
 // Option configures the Engine.
@@ -179,5 +182,16 @@ func WithBudgets(budgets map[string]int) Option {
 func WithMaxSteps(n int) Option {
 	return func(c *engineConfig) {
 		c.maxSteps = n
+	}
+}
+
+// WithMiddleware sets a custom middleware registry for tool execution.
+// If not set, the engine uses a default middleware chain with:
+// - Eligibility middleware (tool access control per state)
+// - Approval middleware (human approval for destructive tools)
+// - Logging middleware (execution timing and results)
+func WithMiddleware(m *middleware.Registry) Option {
+	return func(c *engineConfig) {
+		c.middleware = m
 	}
 }

@@ -10,9 +10,11 @@ import (
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/artifact"
 	"github.com/felixgeelhaar/agent-go/domain/ledger"
+	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	"github.com/felixgeelhaar/agent-go/infrastructure/logging"
+	inframw "github.com/felixgeelhaar/agent-go/infrastructure/middleware"
 	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
 	"github.com/felixgeelhaar/agent-go/infrastructure/resilience"
 	"github.com/felixgeelhaar/agent-go/infrastructure/statemachine"
@@ -29,6 +31,7 @@ type Engine struct {
 	approver    policy.Approver
 	budgetLimits map[string]int
 	maxSteps    int
+	middleware  *middleware.Registry
 }
 
 // EngineConfig contains configuration for the engine.
@@ -42,6 +45,7 @@ type EngineConfig struct {
 	Approver     policy.Approver
 	BudgetLimits map[string]int
 	MaxSteps     int
+	Middleware   *middleware.Registry
 }
 
 // NewEngine creates a new engine with the given configuration.
@@ -63,6 +67,7 @@ func NewEngine(config EngineConfig) (*Engine, error) {
 		approver:     config.Approver,
 		budgetLimits: config.BudgetLimits,
 		maxSteps:     config.MaxSteps,
+		middleware:   config.Middleware,
 	}
 
 	// Set defaults
@@ -78,8 +83,35 @@ func NewEngine(config EngineConfig) (*Engine, error) {
 	if e.maxSteps == 0 {
 		e.maxSteps = 100
 	}
+	if e.middleware == nil {
+		e.middleware = e.defaultMiddlewareChain()
+	}
 
 	return e, nil
+}
+
+// defaultMiddlewareChain creates the default middleware chain that replicates
+// the original inline policy enforcement behavior.
+func (e *Engine) defaultMiddlewareChain() *middleware.Registry {
+	registry := middleware.NewRegistry()
+
+	// Eligibility check (tool allowed in current state)
+	registry.Use(inframw.Eligibility(inframw.EligibilityConfig{
+		Eligibility: e.eligibility,
+	}))
+
+	// Approval check (for destructive/high-risk tools)
+	registry.Use(inframw.Approval(inframw.ApprovalConfig{
+		Approver: e.approver,
+	}))
+
+	// Logging (execution timing and results)
+	registry.Use(inframw.Logging(inframw.LoggingConfig{
+		LogInput:  false,
+		LogOutput: false,
+	}))
+
+	return registry
 }
 
 // Run executes the agent with the given goal.
@@ -223,90 +255,57 @@ func (e *Engine) step(ctx context.Context, interp *statemachine.Interpreter, mac
 	}
 }
 
-// executeToolDecision executes a tool call decision.
-func (e *Engine) executeToolDecision(ctx context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.CallToolDecision) error {
+// executeToolDecision executes a tool call decision using the middleware chain.
+func (e *Engine) executeToolDecision(ctx context.Context, _ *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.CallToolDecision) error {
 	run := machineCtx.Run
 	runLedger := machineCtx.Ledger
 	budget := machineCtx.Budget
 
-	// Check tool eligibility
-	if !interp.IsToolAllowed(decision.ToolName) {
-		return fmt.Errorf("%w: %s in state %s", tool.ErrToolNotAllowed, decision.ToolName, run.CurrentState)
-	}
-
-	// Get tool
+	// Get tool from registry
 	t, ok := e.registry.Get(decision.ToolName)
 	if !ok {
 		return fmt.Errorf("%w: %s", tool.ErrToolNotFound, decision.ToolName)
 	}
 
-	// Check budget
+	// Check budget before execution
 	if !budget.CanConsume("tool_calls", 1) {
 		runLedger.RecordBudgetExhausted(run.CurrentState, "tool_calls")
 		return policy.ErrBudgetExceeded
 	}
 
-	// Check approval for destructive tools
-	if t.Annotations().ShouldRequireApproval() {
-		if e.approver == nil {
-			return tool.ErrApprovalRequired
-		}
-
-		runLedger.RecordApprovalRequest(run.CurrentState, decision.ToolName, decision.Input, t.Annotations().RiskLevel.String())
-
-		resp, err := e.approver.Approve(ctx, policy.ApprovalRequest{
-			RunID:     run.ID,
-			ToolName:  decision.ToolName,
-			Input:     decision.Input,
-			Reason:    decision.Reason,
-			RiskLevel: t.Annotations().RiskLevel.String(),
-			Timestamp: time.Now(),
-		})
-		if err != nil {
-			return fmt.Errorf("approval error: %w", err)
-		}
-
-		runLedger.RecordApprovalResult(run.CurrentState, decision.ToolName, resp.Approved, resp.Approver, resp.Reason)
-
-		if !resp.Approved {
-			return tool.ErrApprovalDenied
-		}
+	// Build execution context for middleware
+	execCtx := &middleware.ExecutionContext{
+		RunID:        run.ID,
+		CurrentState: run.CurrentState,
+		Tool:         t,
+		Input:        decision.Input,
+		Reason:       decision.Reason,
+		Budget:       budget,
+		Vars:         run.Vars,
 	}
 
-	// Record tool call
+	// Record tool call in ledger
 	runLedger.RecordToolCall(run.CurrentState, decision.ToolName, decision.Input)
 
-	logging.Info().
-		Add(logging.RunID(run.ID)).
-		Add(logging.State(run.CurrentState)).
-		Add(logging.ToolName(decision.ToolName)).
-		Msg("executing tool")
+	// Core handler wraps the resilient executor
+	coreHandler := func(ctx context.Context, ec *middleware.ExecutionContext) (tool.Result, error) {
+		return e.executor.Execute(ctx, ec.Tool, ec.Input)
+	}
 
-	// Execute tool with resilience
-	result, err := e.executor.Execute(ctx, t, decision.Input)
+	// Execute through middleware chain
+	handler := e.middleware.Chain()(coreHandler)
+	result, err := handler(ctx, execCtx)
 
-	// Record result or error
+	// Handle errors
 	if err != nil {
 		runLedger.RecordToolError(run.CurrentState, decision.ToolName, err)
-		logging.Error().
-			Add(logging.RunID(run.ID)).
-			Add(logging.ToolName(decision.ToolName)).
-			Add(logging.ErrorField(err)).
-			Msg("tool execution failed")
 		return fmt.Errorf("tool execution failed: %w", err)
 	}
 
-	// Consume budget (already validated with CanConsume above)
+	// Consume budget on success
 	budget.Consume("tool_calls", 1) // #nosec G104 -- validated by CanConsume check above
 	runLedger.RecordBudgetConsumed(run.CurrentState, "tool_calls", 1, budget.Remaining("tool_calls"))
 	runLedger.RecordToolResult(run.CurrentState, decision.ToolName, result.Output, result.Duration, result.Cached)
-
-	logging.Info().
-		Add(logging.RunID(run.ID)).
-		Add(logging.ToolName(decision.ToolName)).
-		Add(logging.Duration(result.Duration)).
-		Add(logging.Cached(result.Cached)).
-		Msg("tool executed")
 
 	// Add evidence
 	run.AddEvidence(agent.NewToolEvidence(decision.ToolName, result.Output))

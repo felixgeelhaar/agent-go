@@ -148,3 +148,10 @@ func Operation(op string) Field {
 		return e.Str("operation", op)
 	}
 }
+
+// Str adds a string field with custom key.
+func Str(key, value string) Field {
+	return func(e *bolt.Event) *bolt.Event {
+		return e.Str(key, value)
+	}
+}
