@@ -36,7 +36,9 @@ func main() {
 		fmt.Printf("Failed to create temp directory: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(workDir)
+	// Use explicit cleanup to ensure it runs even on error
+	cleanup := func() { os.RemoveAll(workDir) }
+	defer cleanup()
 
 	fmt.Printf("=== FileOps Agent Example ===\n")
 	fmt.Printf("Workspace: %s\n\n", workDir)
@@ -44,6 +46,7 @@ func main() {
 	// Run the example
 	if err := runExample(workDir); err != nil {
 		fmt.Printf("Example failed: %v\n", err)
+		cleanup() // Explicit cleanup before exit
 		os.Exit(1)
 	}
 
@@ -193,6 +196,7 @@ func runExample(workDir string) error {
 
 	// Verify the file was actually created
 	filePath := filepath.Join(workDir, "hello.txt")
+	// #nosec G304 -- example code reading known file in controlled temp directory
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("file verification failed: %w", err)

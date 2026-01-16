@@ -14,6 +14,7 @@ import (
 )
 
 // LegacyCache provides in-memory caching for tool results.
+//
 // Deprecated: Use cache.Cache implementations instead.
 type LegacyCache struct {
 	entries map[string]tool.Result
@@ -22,6 +23,7 @@ type LegacyCache struct {
 }
 
 // NewLegacyCache creates a new legacy cache with the specified maximum entries.
+//
 // Deprecated: Use NewCache from infrastructure/storage/memory instead.
 func NewLegacyCache(maxEntries int) *LegacyCache {
 	return &LegacyCache{
@@ -131,6 +133,7 @@ func Caching(c cache.Cache, opts ...CacheOption) middleware.Middleware {
 }
 
 // LegacyCaching returns middleware using the deprecated LegacyCache.
+//
 // Deprecated: Use Caching with cache.Cache instead.
 func LegacyCaching(legacyCache *LegacyCache) middleware.Middleware {
 	return func(next middleware.Handler) middleware.Handler {

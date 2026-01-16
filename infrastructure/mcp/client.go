@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -23,6 +25,9 @@ var (
 
 	// ErrConnectionFailed indicates the connection to the server failed.
 	ErrConnectionFailed = errors.New("connection failed")
+
+	// ErrInvalidCommand indicates the command path is invalid or unsafe.
+	ErrInvalidCommand = errors.New("invalid command")
 )
 
 // ClientTransport defines how to connect to an MCP server.
@@ -231,15 +236,74 @@ func (c *MCPClient) Connect(ctx context.Context) error {
 	return nil
 }
 
+// validateCommand validates and resolves a command path for safe execution.
+// It returns the resolved absolute path to the executable.
+//
+// Security: This function prevents command injection by:
+// 1. Rejecting empty commands
+// 2. Rejecting commands with shell metacharacters
+// 3. Resolving to absolute paths via exec.LookPath
+// 4. Ensuring the command exists and is executable
+func validateCommand(cmd string) (string, error) {
+	if cmd == "" {
+		return "", fmt.Errorf("%w: empty command", ErrInvalidCommand)
+	}
+
+	// Reject shell metacharacters that could be used for injection
+	// These characters have special meaning in shells and should not be in command names
+	shellMetaChars := []string{";", "|", "&", "$", "`", "(", ")", "{", "}", "[", "]", "<", ">", "!", "~", "*", "?", "\\", "'", "\"", "\n", "\r"}
+	for _, char := range shellMetaChars {
+		if strings.Contains(cmd, char) {
+			return "", fmt.Errorf("%w: contains shell metacharacter %q", ErrInvalidCommand, char)
+		}
+	}
+
+	// If already an absolute path, verify it exists
+	if filepath.IsAbs(cmd) {
+		// Clean the path to prevent directory traversal
+		cleanPath := filepath.Clean(cmd)
+		if cleanPath != cmd {
+			return "", fmt.Errorf("%w: path contains traversal elements", ErrInvalidCommand)
+		}
+		// LookPath on absolute paths verifies the file exists and is executable
+		resolved, err := exec.LookPath(cmd)
+		if err != nil {
+			return "", fmt.Errorf("%w: %v", ErrInvalidCommand, err)
+		}
+		return resolved, nil
+	}
+
+	// For relative paths, use LookPath to find in PATH
+	resolved, err := exec.LookPath(cmd)
+	if err != nil {
+		return "", fmt.Errorf("%w: command not found: %v", ErrInvalidCommand, err)
+	}
+
+	return resolved, nil
+}
+
 func (c *MCPClient) connectStdio(ctx context.Context) error {
 	if len(c.config.Command) == 0 {
 		return fmt.Errorf("%w: no command specified", ErrConnectionFailed)
 	}
 
-	// Start the server process
-	c.cmd = exec.CommandContext(ctx, c.config.Command[0], c.config.Command[1:]...)
+	// Validate and resolve the command path
+	resolvedCmd, err := validateCommand(c.config.Command[0])
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+	}
 
-	var err error
+	// Validate arguments don't contain shell metacharacters
+	for i, arg := range c.config.Command[1:] {
+		if strings.ContainsAny(arg, ";|&$`") {
+			return fmt.Errorf("%w: argument %d contains shell metacharacter", ErrConnectionFailed, i+1)
+		}
+	}
+
+	// Start the server process with validated command
+	// #nosec G204 -- command path is validated via validateCommand()
+	c.cmd = exec.CommandContext(ctx, resolvedCmd, c.config.Command[1:]...)
+
 	c.stdin, err = c.cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("%w: stdin pipe: %v", ErrConnectionFailed, err)

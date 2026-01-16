@@ -218,7 +218,6 @@ Be concise in your responses.`,
 	// ============================================
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -239,12 +238,14 @@ Be concise in your responses.`,
 	goal := "What files are in the current directory?"
 	run, err := engine.Run(ctx, goal)
 	if err != nil {
+		cancel() // Explicit cleanup before exit
 		if ctx.Err() != nil {
 			fmt.Println("Agent interrupted by shutdown signal")
 			return
 		}
 		log.Fatalf("Agent execution failed: %v", err)
 	}
+	defer cancel() // Cleanup on normal exit path
 
 	// ============================================
 	// Display results

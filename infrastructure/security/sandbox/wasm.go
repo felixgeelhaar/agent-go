@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -68,7 +69,12 @@ func NewWASM(opts ...Option) (*WASMSandbox, error) {
 
 	// Calculate memory pages from MaxMemory if set
 	if cfg.MaxMemory > 0 && cfg.MaxMemoryPages == 0 {
-		cfg.MaxMemoryPages = uint32(cfg.MaxMemory / (64 * 1024))
+		pages := cfg.MaxMemory / (64 * 1024)
+		// Clamp to uint32 max to prevent overflow
+		if pages > math.MaxUint32 {
+			pages = math.MaxUint32
+		}
+		cfg.MaxMemoryPages = uint32(pages) // #nosec G115 -- bounds checked above
 		if cfg.MaxMemoryPages == 0 {
 			cfg.MaxMemoryPages = 1
 		}
@@ -204,7 +210,11 @@ func (s *WASMSandbox) Execute(ctx context.Context, t tool.Tool, input json.RawMe
 		if err != nil {
 			return tool.Result{}, fmt.Errorf("failed to allocate input: %w", err)
 		}
-		inputPtr := uint32(inputPtrResult[0])
+		// Validate pointer fits in uint32 (WASM memory addresses are 32-bit)
+		if inputPtrResult[0] > math.MaxUint32 {
+			return tool.Result{}, fmt.Errorf("memory pointer exceeds 32-bit address space")
+		}
+		inputPtr := uint32(inputPtrResult[0]) // #nosec G115 -- bounds checked above
 		defer func() { _, _ = free.Call(execCtx, uint64(inputPtr)) }()
 
 		// Write input to WASM memory

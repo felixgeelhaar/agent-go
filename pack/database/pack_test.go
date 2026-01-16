@@ -272,10 +272,8 @@ func TestSchemaTool(t *testing.T) {
 
 	if idCol == nil {
 		t.Error("id column not found")
-	} else {
-		if !idCol.PrimaryKey {
-			t.Error("expected id to be primary key")
-		}
+	} else if !idCol.PrimaryKey {
+		t.Error("expected id to be primary key")
 	}
 }
 

@@ -162,8 +162,10 @@ func New(repoPath string, opts ...Option) (*pack.Pack, error) {
 			AllowInState(agent.StateExplore, "git_status", "git_log", "git_diff", "git_branch").
 			AllowInState(agent.StateValidate, "git_status", "git_log", "git_diff", "git_branch")
 
-		// Build act state tools
-		actTools := append(existingAllowed, "git_checkout")
+		// Build act state tools (copy to avoid modifying original slice)
+		actTools := make([]string, len(existingAllowed)+1)
+		copy(actTools, existingAllowed)
+		actTools[len(existingAllowed)] = "git_checkout"
 		builder = builder.AllowInState(agent.StateAct, actTools...)
 	}
 

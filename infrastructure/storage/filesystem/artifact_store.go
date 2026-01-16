@@ -43,6 +43,7 @@ func (s *ArtifactStore) Store(ctx context.Context, content io.Reader, opts artif
 
 	// Write content to file
 	contentPath := filepath.Join(artifactPath, "content")
+	// #nosec G304 -- path is constructed from internally generated artifact ID, not user input
 	file, err := os.Create(contentPath)
 	if err != nil {
 		return artifact.Ref{}, fmt.Errorf("failed to create content file: %w", err)
@@ -86,6 +87,7 @@ func (s *ArtifactStore) Store(ctx context.Context, content io.Reader, opts artif
 
 	// Write metadata file
 	metaPath := filepath.Join(artifactPath, "metadata.json")
+	// #nosec G304 -- path is constructed from internally generated artifact ID, not user input
 	metaFile, err := os.Create(metaPath)
 	if err != nil {
 		os.RemoveAll(artifactPath) // #nosec G104 -- best-effort cleanup in error path
@@ -114,6 +116,7 @@ func (s *ArtifactStore) Retrieve(_ context.Context, ref artifact.Ref) (io.ReadCl
 	}
 
 	contentPath := filepath.Join(s.artifactPath(ref.ID), "content")
+	// #nosec G304 -- path is constructed from validated artifact ref, not user input
 	file, err := os.Open(contentPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -167,6 +170,7 @@ func (s *ArtifactStore) Metadata(_ context.Context, ref artifact.Ref) (artifact.
 	}
 
 	metaPath := filepath.Join(s.artifactPath(ref.ID), "metadata.json")
+	// #nosec G304 -- path is constructed from validated artifact ref, not user input
 	file, err := os.Open(metaPath)
 	if err != nil {
 		if os.IsNotExist(err) {

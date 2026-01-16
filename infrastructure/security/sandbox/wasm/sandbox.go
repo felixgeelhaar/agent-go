@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -39,7 +40,12 @@ func New(opts ...sandbox.Option) (*Sandbox, error) {
 	runtimeConfig := wazero.NewRuntimeConfig()
 	if cfg.MaxMemory > 0 {
 		// WASM memory is in pages of 64KB
-		maxPages := uint32(cfg.MaxMemory / 65536)
+		pages := cfg.MaxMemory / 65536
+		// Clamp to uint32 max to prevent overflow
+		if pages > math.MaxUint32 {
+			pages = math.MaxUint32
+		}
+		maxPages := uint32(pages) // #nosec G115 -- bounds checked above
 		if maxPages == 0 {
 			maxPages = 1
 		}
@@ -160,7 +166,11 @@ func (s *Sandbox) executeWASM(ctx context.Context, t WASMTool, input json.RawMes
 		return tool.Result{}, fmt.Errorf("module has no memory")
 	}
 
-	if !memory.Write(uint32(inputPtr), input) {
+	// Validate inputPtr fits in uint32 (WASM memory addresses are 32-bit)
+	if inputPtr > math.MaxUint32 {
+		return tool.Result{}, fmt.Errorf("memory pointer exceeds 32-bit address space")
+	}
+	if !memory.Write(uint32(inputPtr), input) { // #nosec G115 -- bounds checked above
 		return tool.Result{}, fmt.Errorf("failed to write input to memory")
 	}
 
@@ -172,8 +182,12 @@ func (s *Sandbox) executeWASM(ctx context.Context, t WASMTool, input json.RawMes
 
 	// Read result from memory
 	if len(results) >= 2 {
-		resultPtr := uint32(results[0])
-		resultLen := uint32(results[1])
+		// Validate results fit in uint32 (WASM memory addresses are 32-bit)
+		if results[0] > math.MaxUint32 || results[1] > math.MaxUint32 {
+			return tool.Result{}, fmt.Errorf("result pointer or length exceeds 32-bit address space")
+		}
+		resultPtr := uint32(results[0]) // #nosec G115 -- bounds checked above
+		resultLen := uint32(results[1]) // #nosec G115 -- bounds checked above
 
 		resultBytes, ok := memory.Read(resultPtr, resultLen)
 		if !ok {

@@ -89,12 +89,14 @@ func writeFileTool() tool.Tool {
 			}
 
 			// Ensure directory exists
+			// Use 0750 for directories (owner: rwx, group: rx, others: none)
 			dir := filepath.Dir(in.Path)
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0750); err != nil { // #nosec G301 -- intentionally restrictive
 				return tool.Result{}, err
 			}
 
-			if err := os.WriteFile(in.Path, []byte(in.Content), 0644); err != nil {
+			// Use 0600 for files (owner: rw, others: none)
+			if err := os.WriteFile(in.Path, []byte(in.Content), 0600); err != nil { // #nosec G306 -- intentionally restrictive
 				return tool.Result{}, err
 			}
 
@@ -224,7 +226,8 @@ func mkdirTool() tool.Tool {
 			_, err := os.Stat(in.Path)
 			existed := err == nil
 
-			if err := os.MkdirAll(in.Path, 0755); err != nil {
+			// Use 0750 for directories (owner: rwx, group: rx, others: none)
+			if err := os.MkdirAll(in.Path, 0750); err != nil { // #nosec G301 -- intentionally restrictive
 				return tool.Result{}, err
 			}
 

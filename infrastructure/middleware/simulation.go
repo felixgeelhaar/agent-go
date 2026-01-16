@@ -27,15 +27,16 @@ func Simulation(cfg simulation.Config) middleware.Middleware {
 			canExecute := false
 			blockReason := ""
 
-			if annotations.ReadOnly && cfg.AllowReadOnly {
+			switch {
+			case annotations.ReadOnly && cfg.AllowReadOnly:
 				canExecute = true
-			} else if annotations.Idempotent && cfg.AllowIdempotent {
+			case annotations.Idempotent && cfg.AllowIdempotent:
 				canExecute = true
-			} else if annotations.ReadOnly {
+			case annotations.ReadOnly:
 				blockReason = "read-only tools not allowed in this simulation mode"
-			} else if annotations.Destructive {
+			case annotations.Destructive:
 				blockReason = "destructive tools blocked in simulation mode"
-			} else {
+			default:
 				blockReason = "tool blocked in simulation mode"
 			}
 

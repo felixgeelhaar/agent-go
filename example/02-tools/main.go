@@ -15,16 +15,22 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	// Create a temporary directory for the example
 	tmpDir, err := os.MkdirTemp("", "agent-tools-example")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer os.RemoveAll(tmpDir)
 
 	// Create test file
 	testFile := filepath.Join(tmpDir, "test.txt")
-	os.WriteFile(testFile, []byte("Hello from the test file!"), 0644)
+	_ = os.WriteFile(testFile, []byte("Hello from the test file!"), 0600) // #nosec G306
 
 	// ============================================
 	// Tool 1: read_file (ReadOnly, Idempotent, Cacheable)
@@ -78,7 +84,7 @@ func main() {
 				return tool.Result{}, err
 			}
 
-			if err := os.WriteFile(in.Path, []byte(in.Content), 0644); err != nil {
+			if err := os.WriteFile(in.Path, []byte(in.Content), 0600); err != nil { // #nosec G306
 				return tool.Result{}, fmt.Errorf("failed to write file: %w", err)
 			}
 
@@ -186,22 +192,23 @@ func main() {
 		agent.WithMaxSteps(10),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Run the agent
-	run, err := engine.Run(context.Background(), "Read test file and write output")
+	agentRun, err := engine.Run(context.Background(), "Read test file and write output")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Display results
 	fmt.Println("=== Tools Example ===")
-	fmt.Printf("Status: %s\n", run.Status)
-	fmt.Printf("Steps: %d\n", len(run.Evidence))
+	fmt.Printf("Status: %s\n", agentRun.Status)
+	fmt.Printf("Steps: %d\n", len(agentRun.Evidence))
 	fmt.Println()
 
 	// Verify output was written
+	// #nosec G304 -- example code reading known output file in controlled temp directory
 	if content, err := os.ReadFile(outputFile); err == nil {
 		fmt.Printf("Output file contents: %s\n", string(content))
 	}
@@ -211,4 +218,6 @@ func main() {
 	fmt.Println("read_file:   ReadOnly=true,  Destructive=false, Risk=Low")
 	fmt.Println("write_file:  ReadOnly=false, Destructive=false, Risk=Medium")
 	fmt.Println("delete_file: ReadOnly=false, Destructive=true,  Risk=High")
+
+	return nil
 }

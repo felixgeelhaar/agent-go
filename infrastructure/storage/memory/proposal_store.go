@@ -209,23 +209,25 @@ func sortProposals(proposals []*proposal.Proposal, orderBy proposal.OrderBy, des
 		case proposal.OrderByCreatedAt:
 			less = proposals[i].CreatedAt.Before(proposals[j].CreatedAt)
 		case proposal.OrderBySubmittedAt:
-			if proposals[i].SubmittedAt == nil && proposals[j].SubmittedAt == nil {
+			switch {
+			case proposals[i].SubmittedAt == nil && proposals[j].SubmittedAt == nil:
 				less = false
-			} else if proposals[i].SubmittedAt == nil {
+			case proposals[i].SubmittedAt == nil:
 				less = true
-			} else if proposals[j].SubmittedAt == nil {
+			case proposals[j].SubmittedAt == nil:
 				less = false
-			} else {
+			default:
 				less = proposals[i].SubmittedAt.Before(*proposals[j].SubmittedAt)
 			}
 		case proposal.OrderByApprovedAt:
-			if proposals[i].ApprovedAt == nil && proposals[j].ApprovedAt == nil {
+			switch {
+			case proposals[i].ApprovedAt == nil && proposals[j].ApprovedAt == nil:
 				less = false
-			} else if proposals[i].ApprovedAt == nil {
+			case proposals[i].ApprovedAt == nil:
 				less = true
-			} else if proposals[j].ApprovedAt == nil {
+			case proposals[j].ApprovedAt == nil:
 				less = false
-			} else {
+			default:
 				less = proposals[i].ApprovedAt.Before(*proposals[j].ApprovedAt)
 			}
 		case proposal.OrderByStatus:

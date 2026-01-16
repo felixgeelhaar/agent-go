@@ -316,14 +316,14 @@ func tablesTool(cfg *Config) tool.Tool {
 				for rows.Next() {
 					var t tableInfo
 					if err := rows.Scan(&t.Name, &t.Schema, &t.Type); err != nil {
-						rows.Close()
+						_ = rows.Close() // Error intentionally ignored - we're handling scan error
 						lastErr = err
 						tables = nil
 						break
 					}
 					tables = append(tables, t)
 				}
-				rows.Close()
+				_ = rows.Close() // Error intentionally ignored - data already processed
 
 				if tables != nil {
 					break

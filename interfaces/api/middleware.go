@@ -34,6 +34,7 @@ type (
 	Cache = cache.Cache
 
 	// LegacyMiddlewareCache provides in-memory caching for tool results.
+	//
 	// Deprecated: Use Cache interface with NewMemoryCache instead.
 	LegacyMiddlewareCache = inframw.LegacyCache
 )
@@ -49,6 +50,7 @@ func NewMemoryCache(maxEntries int) *memory.Cache {
 }
 
 // NewLegacyMiddlewareCache creates a new cache with the specified maximum entries.
+//
 // Deprecated: Use NewMemoryCache instead.
 func NewLegacyMiddlewareCache(maxEntries int) *LegacyMiddlewareCache {
 	return inframw.NewLegacyCache(maxEntries)
@@ -137,6 +139,7 @@ func WithCacheTTL(ttl time.Duration) CacheOption {
 }
 
 // LegacyCachingMiddleware returns middleware using the deprecated LegacyCache.
+//
 // Deprecated: Use CachingMiddleware with Cache interface instead.
 func LegacyCachingMiddleware(legacyCache *LegacyMiddlewareCache) Middleware {
 	return inframw.LegacyCaching(legacyCache)

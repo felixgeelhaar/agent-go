@@ -386,9 +386,9 @@ func exportVisualization(ctx context.Context, runStore *memory.RunStore, eventSt
 		}
 		fmt.Println("  ```")
 
-		// Save exports to files
-		os.WriteFile("state_machine.dot", dotData, 0644)
-		os.WriteFile("state_machine.mmd", mermaidData, 0644)
+		// Save exports to files (example code - permissive for readability)
+		_ = os.WriteFile("state_machine.dot", dotData, 0600)  // #nosec G306
+		_ = os.WriteFile("state_machine.mmd", mermaidData, 0600) // #nosec G306
 		fmt.Println("\n  Saved: state_machine.dot, state_machine.mmd")
 	}
 

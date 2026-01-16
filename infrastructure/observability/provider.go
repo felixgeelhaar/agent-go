@@ -3,8 +3,10 @@ package observability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/telemetry"
@@ -109,11 +111,12 @@ func (p *Provider) setupTracing() error {
 
 	// Create sampler
 	var sampler sdktrace.Sampler
-	if p.config.Tracing.SampleRate >= 1.0 {
+	switch {
+	case p.config.Tracing.SampleRate >= 1.0:
 		sampler = sdktrace.AlwaysSample()
-	} else if p.config.Tracing.SampleRate <= 0.0 {
+	case p.config.Tracing.SampleRate <= 0.0:
 		sampler = sdktrace.NeverSample()
-	} else {
+	default:
 		sampler = sdktrace.TraceIDRatioBased(p.config.Tracing.SampleRate)
 	}
 
@@ -212,8 +215,23 @@ func NewNoopProvider() *Provider {
 }
 
 // WriteTraceToFile creates a stdout trace exporter that writes to a file.
+// The path is cleaned and validated to prevent directory traversal.
 func WriteTraceToFile(path string) (io.Closer, error) {
-	f, err := os.Create(path)
+	// Clean the path to prevent directory traversal
+	cleanPath := filepath.Clean(path)
+
+	// Reject paths that could escape the intended directory
+	if cleanPath != path && filepath.IsAbs(path) {
+		return nil, fmt.Errorf("invalid path: contains directory traversal")
+	}
+
+	// Ensure the path doesn't start with .. after cleaning
+	if len(cleanPath) >= 2 && cleanPath[:2] == ".." {
+		return nil, fmt.Errorf("invalid path: attempts to escape current directory")
+	}
+
+	// #nosec G304 -- path is cleaned and validated above
+	f, err := os.Create(cleanPath)
 	if err != nil {
 		return nil, err
 	}

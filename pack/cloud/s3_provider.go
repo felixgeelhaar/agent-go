@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -103,9 +104,17 @@ func (p *S3Provider) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 
 // ListObjects lists objects in a bucket with optional prefix.
 func (p *S3Provider) ListObjects(ctx context.Context, bucket, prefix string, maxKeys int) ([]ObjectInfo, error) {
+	// Clamp maxKeys to int32 range to prevent overflow
+	clampedMaxKeys := maxKeys
+	if clampedMaxKeys > math.MaxInt32 {
+		clampedMaxKeys = math.MaxInt32
+	}
+	if clampedMaxKeys < 0 {
+		clampedMaxKeys = 0
+	}
 	input := &s3.ListObjectsV2Input{
 		Bucket:  aws.String(bucket),
-		MaxKeys: aws.Int32(int32(maxKeys)),
+		MaxKeys: aws.Int32(int32(clampedMaxKeys)), // #nosec G115 -- bounds checked above
 	}
 	if prefix != "" {
 		input.Prefix = aws.String(prefix)
