@@ -1,0 +1,610 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import StateMachine from '../components/StateMachine.vue';
+import CodeTabs from '../components/CodeTabs.vue';
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="agent-go | State-Driven Agent Runtime for Go">
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span class="badge-dot"></span>
+                        <span>State-Driven Agent Runtime</span>
+                    </div>
+                    <h1>
+                        <span class="hero-line">Build agents with</span>
+                        <span class="hero-highlight">structural trust</span>
+                    </h1>
+                    <p class="hero-tagline">
+                        Design the constraints of intelligence, not the intelligence itself.
+                        A Go runtime where <em>trust is the product</em>.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#quickstart" class="btn btn-primary btn-large">
+                            Get Started
+                            <span class="btn-arrow">→</span>
+                        </a>
+                        <a href={`${base}docs`} class="btn btn-secondary btn-large">
+                            Documentation
+                        </a>
+                    </div>
+                    <div class="hero-install">
+                        <code>go get github.com/felixgeelhaar/agent-go</code>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <StateMachine client:load />
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// CAPABILITIES</span>
+                    <h2>Engineered for Production</h2>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">◈</div>
+                        <h3>Canonical State Machine</h3>
+                        <p>7 states with explicit semantics. Side effects only in Act state. Deterministic, auditable execution flow.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⬡</div>
+                        <h3>Policy Enforcement</h3>
+                        <p>Tool eligibility per state. Budget limits. Approval requirements for destructive actions. Constraints, not hope.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">◇</div>
+                        <h3>Resilient Execution</h3>
+                        <p>Circuit breakers, retry with backoff, bulkheads, timeouts. Built on battle-tested patterns via Fortify.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">▣</div>
+                        <h3>Tool Annotations</h3>
+                        <p>ReadOnly, Destructive, Idempotent, Cacheable. Metadata that influences behavior, not just documentation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">◉</div>
+                        <h3>Human-in-the-Loop</h3>
+                        <p>AskHuman decision type. Pause execution, collect input, resume with evidence. Built-in approval workflows.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⬢</div>
+                        <h3>Knowledge Store</h3>
+                        <p>Vector embeddings with cosine similarity search. RAG-ready architecture for persistent agent memory.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- States Section -->
+        <section class="states" id="states">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// STATE MACHINE</span>
+                    <h2>Canonical Execution States</h2>
+                </div>
+                <div class="states-table-wrapper">
+                    <table class="states-table">
+                        <thead>
+                            <tr>
+                                <th>State</th>
+                                <th>Purpose</th>
+                                <th>Side Effects</th>
+                                <th>Terminal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="state-intake">intake</code></td>
+                                <td>Normalize and validate goal</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-muted">No</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="state-explore">explore</code></td>
+                                <td>Gather evidence, read-only operations</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-muted">No</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="state-decide">decide</code></td>
+                                <td>Plan next action</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-muted">No</span></td>
+                            </tr>
+                            <tr class="state-row-highlight">
+                                <td><code class="state-act">act</code></td>
+                                <td>Execute side effects</td>
+                                <td><span class="badge badge-danger">Yes</span></td>
+                                <td><span class="badge badge-muted">No</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="state-validate">validate</code></td>
+                                <td>Confirm action outcomes</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-muted">No</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="state-done">done</code></td>
+                                <td>Successful completion</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-terminal">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="state-failed">failed</code></td>
+                                <td>Error termination</td>
+                                <td><span class="badge badge-safe">No</span></td>
+                                <td><span class="badge badge-terminal">Yes</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="states-note">
+                    <span class="note-icon">◈</span>
+                    <p><strong>Key Invariant:</strong> Only the <code>act</code> state permits side effects. All other states are pure observation and decision.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quickstart Section -->
+        <section class="quickstart" id="quickstart">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// GET STARTED</span>
+                    <h2>Quickstart</h2>
+                </div>
+                <CodeTabs client:load />
+            </div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section class="architecture">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// ARCHITECTURE</span>
+                    <h2>Domain-Driven Design</h2>
+                </div>
+                <div class="arch-grid">
+                    <div class="arch-layer">
+                        <div class="arch-layer-header">
+                            <span class="arch-layer-tag">domain/</span>
+                            <h4>Core Domain</h4>
+                        </div>
+                        <ul class="arch-items">
+                            <li><code>agent/</code> State, Decision, Run, Evidence</li>
+                            <li><code>tool/</code> Tool, Annotation, Registry</li>
+                            <li><code>policy/</code> Budget, Approval, Constraint</li>
+                            <li><code>ledger/</code> Audit trail, Events</li>
+                        </ul>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-header">
+                            <span class="arch-layer-tag">application/</span>
+                            <h4>Application Layer</h4>
+                        </div>
+                        <ul class="arch-items">
+                            <li><code>engine.go</code> Orchestration service</li>
+                            <li><code>options.go</code> Configuration</li>
+                        </ul>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-header">
+                            <span class="arch-layer-tag">infrastructure/</span>
+                            <h4>Infrastructure</h4>
+                        </div>
+                        <ul class="arch-items">
+                            <li><code>statemachine/</code> Statekit integration</li>
+                            <li><code>resilience/</code> Fortify patterns</li>
+                            <li><code>planner/</code> Mock, Scripted, LLM</li>
+                            <li><code>storage/</code> Memory, Filesystem</li>
+                        </ul>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-header">
+                            <span class="arch-layer-tag">interfaces/api/</span>
+                            <h4>Public API</h4>
+                        </div>
+                        <ul class="arch-items">
+                            <li><code>agent.go</code> Engine, Options, Re-exports</li>
+                            <li><code>builders.go</code> Fluent constructors</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta">
+            <div class="container">
+                <div class="cta-content">
+                    <h2>Ready to build trustworthy agents?</h2>
+                    <p>Start with constraints. Add intelligence later.</p>
+                    <div class="cta-actions">
+                        <a href={`${base}docs`} class="btn btn-primary btn-large">
+                            Read the Docs
+                            <span class="btn-arrow">→</span>
+                        </a>
+                        <a href="https://github.com/felixgeelhaar/agent-go" class="btn btn-secondary btn-large" target="_blank">
+                            View on GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</BaseLayout>
+
+<style>
+/* Hero Section */
+.hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: calc(60px + var(--space-3xl)) 0 var(--space-4xl);
+    position: relative;
+}
+
+.hero .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4xl);
+    align-items: center;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 100px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-lg);
+}
+
+.badge-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-cyan);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.hero h1 {
+    margin-bottom: var(--space-lg);
+}
+
+.hero-line {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.6em;
+    font-weight: 400;
+}
+
+.hero-highlight {
+    display: block;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-amber));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-tagline {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xl);
+    max-width: 480px;
+}
+
+.hero-actions {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+.hero-install {
+    display: inline-block;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.hero-install code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent-cyan);
+}
+
+.hero-visual {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Features Section */
+.features {
+    padding: var(--space-4xl) 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+}
+
+.feature-card {
+    padding: var(--space-xl);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    transition: all var(--transition-base);
+}
+
+.feature-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-4px);
+}
+
+.feature-icon {
+    font-size: 1.5rem;
+    color: var(--accent-cyan);
+    margin-bottom: var(--space-md);
+}
+
+.feature-card h3 {
+    font-size: 1rem;
+    margin-bottom: var(--space-sm);
+    color: var(--text-primary);
+}
+
+.feature-card p {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+}
+
+/* States Section */
+.states {
+    padding: var(--space-4xl) 0;
+}
+
+.states-table-wrapper {
+    overflow-x: auto;
+    margin-bottom: var(--space-xl);
+}
+
+.states-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.states-table th,
+.states-table td {
+    padding: var(--space-md) var(--space-lg);
+    text-align: left;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.states-table th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+}
+
+.states-table td code {
+    font-weight: 600;
+}
+
+.state-intake { color: var(--accent-purple); }
+.state-explore { color: var(--accent-cyan); }
+.state-decide { color: var(--accent-amber); }
+.state-act { color: var(--accent-red); }
+.state-validate { color: var(--accent-green); }
+.state-done { color: var(--accent-green); }
+.state-failed { color: var(--accent-red); }
+
+.state-row-highlight {
+    background: rgba(248, 81, 73, 0.05);
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-safe {
+    background: var(--accent-green);
+    color: var(--bg-primary);
+}
+
+.badge-danger {
+    background: var(--accent-red);
+    color: white;
+}
+
+.badge-terminal {
+    background: var(--accent-amber);
+    color: var(--bg-primary);
+}
+
+.badge-muted {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.states-note {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-left: 4px solid var(--accent-amber);
+    border-radius: 8px;
+}
+
+.note-icon {
+    color: var(--accent-amber);
+    font-size: 1.2rem;
+}
+
+.states-note p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Quickstart Section */
+.quickstart {
+    padding: var(--space-4xl) 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+/* Architecture Section */
+.architecture {
+    padding: var(--space-4xl) 0;
+}
+
+.arch-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-lg);
+}
+
+.arch-layer {
+    padding: var(--space-xl);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+}
+
+.arch-layer-header {
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.arch-layer-tag {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--accent-cyan);
+    margin-bottom: var(--space-xs);
+    letter-spacing: 0.05em;
+}
+
+.arch-layer h4 {
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.arch-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.arch-items li {
+    padding: var(--space-sm) 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border-bottom: 1px dashed var(--border-secondary);
+}
+
+.arch-items li:last-child {
+    border-bottom: none;
+}
+
+.arch-items code {
+    color: var(--accent-amber);
+    font-size: 0.8rem;
+    margin-right: var(--space-sm);
+}
+
+/* CTA Section */
+.cta {
+    padding: var(--space-4xl) 0;
+    text-align: center;
+}
+
+.cta-content h2 {
+    margin-bottom: var(--space-md);
+}
+
+.cta-content p {
+    font-size: 1.1rem;
+    margin-bottom: var(--space-xl);
+}
+
+.cta-actions {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .hero .container {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .hero-tagline {
+        max-width: 100%;
+    }
+
+    .hero-actions {
+        justify-content: center;
+    }
+
+    .hero-visual {
+        order: -1;
+    }
+
+    .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .arch-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cta-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+</style>

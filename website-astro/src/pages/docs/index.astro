@@ -1,0 +1,199 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<DocsLayout
+    title="Introduction"
+    description="A Go runtime that enables developers to build trustworthy, adaptable AI-powered systems by designing constraints, not scripting intelligence."
+    currentPage="index"
+>
+    <section class="article-section">
+        <h2>What is agent-go?</h2>
+        <p>
+            <strong>agent-go</strong> is a state-driven agent runtime for Go that enables developers to build
+            trustworthy, adaptable AI-powered systems. Instead of scripting intelligence with prompts, you
+            design the <em>structure and constraints</em> of agent behavior.
+        </p>
+        <p>
+            The key principle: <strong>Trust is the product.</strong> Intelligence is constrained by design, not hope.
+        </p>
+    </section>
+
+    <section class="article-section">
+        <h2>Why agent-go?</h2>
+        <div class="feature-grid-docs">
+            <div class="feature-item">
+                <h3>Structural Trust</h3>
+                <p>Side effects only occur in explicitly designated states. The planner cannot bypass constraints no matter what.</p>
+            </div>
+            <div class="feature-item">
+                <h3>Testable Without LLMs</h3>
+                <p>Use ScriptedPlanner for deterministic tests. No API calls needed during development.</p>
+            </div>
+            <div class="feature-item">
+                <h3>Production Ready</h3>
+                <p>Built-in resilience patterns: circuit breakers, retry, bulkheads, timeouts. Battle-tested via Fortify.</p>
+            </div>
+            <div class="feature-item">
+                <h3>Domain-Driven Design</h3>
+                <p>Clean architecture with separated domain, application, and infrastructure layers.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="article-section">
+        <h2>Core Design Principles</h2>
+        <ul>
+            <li><strong>States are constraints, not behaviors</strong> - The canonical state machine defines where actions can occur</li>
+            <li><strong>Planners propose, engines dispose</strong> - All decisions are validated against policies</li>
+            <li><strong>Evidence is append-only</strong> - Complete audit trail of all operations</li>
+            <li><strong>Optional everything</strong> - No required external services for basic operation</li>
+        </ul>
+    </section>
+
+    <section class="article-section">
+        <h2>Design Invariants</h2>
+        <p>These invariants hold in all code paths:</p>
+        <ol>
+            <li><strong>Tool eligibility</strong> - Tools only run in explicitly allowed states</li>
+            <li><strong>Transition validity</strong> - State changes follow the defined graph</li>
+            <li><strong>Approval enforcement</strong> - Destructive actions require approval</li>
+            <li><strong>Budget enforcement</strong> - Limits are never exceeded</li>
+            <li><strong>State semantics</strong> - Only Act state allows side effects</li>
+            <li><strong>Tool uniqueness</strong> - Tool names are unique per registry</li>
+            <li><strong>Run lifecycle</strong> - Runs progress through states to terminal state</li>
+            <li><strong>Evidence accumulation</strong> - Evidence is append-only, order preserved</li>
+        </ol>
+    </section>
+
+    <section class="article-section">
+        <h2>Next Steps</h2>
+        <div class="next-steps">
+            <a href={`${base}docs/installation`} class="next-step-card">
+                <span class="next-step-number">01</span>
+                <h3>Installation</h3>
+                <p>Add agent-go to your project</p>
+                <span class="next-step-arrow">→</span>
+            </a>
+            <a href={`${base}docs/quickstart`} class="next-step-card">
+                <span class="next-step-number">02</span>
+                <h3>Quickstart</h3>
+                <p>Build your first agent in minutes</p>
+                <span class="next-step-arrow">→</span>
+            </a>
+            <a href={`${base}docs/concepts`} class="next-step-card">
+                <span class="next-step-number">03</span>
+                <h3>Core Concepts</h3>
+                <p>Understand the architecture</p>
+                <span class="next-step-arrow">→</span>
+            </a>
+        </div>
+    </section>
+</DocsLayout>
+
+<style>
+.article-section {
+    margin-bottom: var(--space-3xl);
+}
+
+.feature-grid-docs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-lg);
+    margin: var(--space-xl) 0;
+}
+
+.feature-item {
+    padding: var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    transition: border-color var(--transition-fast);
+}
+
+.feature-item:hover {
+    border-color: var(--accent-cyan);
+}
+
+.feature-item h3 {
+    margin-top: 0;
+    margin-bottom: var(--space-sm);
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.feature-item p {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+}
+
+.next-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+    margin-top: var(--space-xl);
+}
+
+.next-step-card {
+    display: block;
+    padding: var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    transition: all var(--transition-base);
+    position: relative;
+    text-decoration: none;
+}
+
+.next-step-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-4px);
+}
+
+.next-step-number {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    margin-bottom: var(--space-sm);
+    display: block;
+}
+
+.next-step-card h3 {
+    margin: 0 0 var(--space-xs) 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.next-step-card p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.next-step-arrow {
+    position: absolute;
+    top: var(--space-lg);
+    right: var(--space-lg);
+    color: var(--accent-cyan);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: all var(--transition-fast);
+}
+
+.next-step-card:hover .next-step-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+@media (max-width: 1024px) {
+    .feature-grid-docs {
+        grid-template-columns: 1fr;
+    }
+
+    .next-steps {
+        grid-template-columns: 1fr;
+    }
+}
+</style>

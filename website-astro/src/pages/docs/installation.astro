@@ -1,0 +1,152 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+// Code snippets stored as raw HTML to avoid Astro parsing curly braces
+const importCode = `<pre><code><span class="keyword">import</span> api <span class="string">"github.com/felixgeelhaar/agent-go/interfaces/api"</span></code></pre>`;
+
+const verifyCode = `<pre><code><span class="keyword">package</span> main
+
+<span class="keyword">import</span> (
+    <span class="string">"fmt"</span>
+    api <span class="string">"github.com/felixgeelhaar/agent-go/interfaces/api"</span>
+)
+
+<span class="keyword">func</span> main() {
+    <span class="comment">// Create a tool registry</span>
+    registry := api.NewToolRegistry()
+    fmt.Printf(<span class="string">"agent-go installed successfully! Registry: %T\\n"</span>, registry)
+}</code></pre>`;
+---
+
+<DocsLayout
+    title="Installation"
+    description="Add agent-go to your Go project in seconds."
+    currentPage="installation"
+>
+    <section class="article-section">
+        <h2>Requirements</h2>
+        <ul>
+            <li><strong>Go 1.21+</strong> - agent-go uses modern Go features</li>
+            <li><strong>Go modules</strong> - the project uses Go modules for dependency management</li>
+        </ul>
+    </section>
+
+    <section class="article-section">
+        <h2>Install with go get</h2>
+        <p>Add agent-go to your project:</p>
+        <div class="code-block-docs">
+            <pre><code>go get github.com/felixgeelhaar/agent-go</code></pre>
+        </div>
+    </section>
+
+    <section class="article-section">
+        <h2>Import the API</h2>
+        <p>The public API is exposed through the <code>interfaces/api</code> package:</p>
+        <div class="code-block-docs" set:html={importCode} />
+        <p>This package re-exports all commonly used types and functions, so you typically only need this single import.</p>
+    </section>
+
+    <section class="article-section">
+        <h2>Verify Installation</h2>
+        <p>Create a simple test file to verify everything works:</p>
+        <div class="code-block-docs" set:html={verifyCode} />
+        <p>Run with:</p>
+        <div class="code-block-docs">
+            <pre><code>go run main.go</code></pre>
+        </div>
+    </section>
+
+    <section class="article-section">
+        <h2>Dependencies</h2>
+        <p>agent-go uses these external libraries:</p>
+        <ul>
+            <li><strong>statekit</strong> - Statechart execution engine with hierarchical states, guards, and actions</li>
+            <li><strong>fortify</strong> - Resilience patterns (circuit breaker, retry, rate limiter, bulkhead)</li>
+            <li><strong>bolt</strong> - High-performance zero-allocation structured logging</li>
+        </ul>
+        <p>These are automatically installed when you <code>go get</code> agent-go.</p>
+    </section>
+
+    <nav class="page-nav">
+        <a href={`${base}docs`} class="page-nav-prev">
+            <span class="page-nav-label">Previous</span>
+            <span class="page-nav-title">← Introduction</span>
+        </a>
+        <a href={`${base}docs/quickstart`} class="page-nav-next">
+            <span class="page-nav-label">Next</span>
+            <span class="page-nav-title">Quickstart →</span>
+        </a>
+    </nav>
+</DocsLayout>
+
+<style>
+.article-section {
+    margin-bottom: var(--space-3xl);
+}
+
+.code-block-docs {
+    margin: var(--space-lg) 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.code-block-docs :global(pre) {
+    padding: var(--space-lg);
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    overflow-x: auto;
+}
+
+.code-block-docs :global(code) {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* Syntax highlighting */
+:global(.keyword) { color: var(--accent-purple); }
+:global(.string) { color: var(--accent-green); }
+:global(.comment) { color: var(--text-muted); font-style: italic; }
+:global(.number) { color: var(--accent-amber); }
+
+.page-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border-primary);
+}
+
+.page-nav-prev,
+.page-nav-next {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    text-decoration: none;
+}
+
+.page-nav-next {
+    text-align: right;
+}
+
+.page-nav-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.page-nav-title {
+    font-size: 0.9rem;
+    color: var(--accent-cyan);
+    font-weight: 500;
+}
+
+.page-nav a:hover .page-nav-title {
+    color: var(--text-primary);
+}
+</style>

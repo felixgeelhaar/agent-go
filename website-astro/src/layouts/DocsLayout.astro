@@ -1,0 +1,470 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  section?: string;
+  currentPage?: string;
+}
+
+const { title, description, section = "Getting Started", currentPage = "" } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content={description || "agent-go documentation"}>
+    <title>{title} | agent-go</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href={base} class="logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">agent-go</span>
+                <span class="logo-bracket">]</span>
+                <span class="logo-version">v0.2.0</span>
+            </a>
+            <div class="nav-links">
+                <a href={`${base}#features`}>Features</a>
+                <a href={`${base}#states`}>States</a>
+                <a href={`${base}#quickstart`}>Quickstart</a>
+                <a href={`${base}docs`} class="active">Docs</a>
+                <a href="https://github.com/felixgeelhaar/agent-go" class="nav-github" target="_blank" rel="noopener">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar">
+            <div class="sidebar-section">
+                <h4 class="sidebar-title">Getting Started</h4>
+                <ul class="sidebar-nav">
+                    <li><a href={`${base}docs`} class:list={[{ active: currentPage === 'index' }]}>Introduction</a></li>
+                    <li><a href={`${base}docs/installation`} class:list={[{ active: currentPage === 'installation' }]}>Installation</a></li>
+                    <li><a href={`${base}docs/quickstart`} class:list={[{ active: currentPage === 'quickstart' }]}>Quickstart</a></li>
+                    <li><a href={`${base}docs/concepts`} class:list={[{ active: currentPage === 'concepts' }]}>Core Concepts</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <h4 class="sidebar-title">Architecture</h4>
+                <ul class="sidebar-nav">
+                    <li><a href={`${base}docs/states`} class:list={[{ active: currentPage === 'states' }]}>State Machine</a></li>
+                    <li><a href={`${base}docs/tools`} class:list={[{ active: currentPage === 'tools' }]}>Tools</a></li>
+                    <li><a href={`${base}docs/planners`} class:list={[{ active: currentPage === 'planners' }]}>Planners</a></li>
+                    <li><a href={`${base}docs/policies`} class:list={[{ active: currentPage === 'policies' }]}>Policies</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <h4 class="sidebar-title">Features</h4>
+                <ul class="sidebar-nav">
+                    <li><a href={`${base}docs/resilience`} class:list={[{ active: currentPage === 'resilience' }]}>Resilience</a></li>
+                    <li><a href={`${base}docs/middleware`} class:list={[{ active: currentPage === 'middleware' }]}>Middleware</a></li>
+                    <li><a href={`${base}docs/human-in-loop`} class:list={[{ active: currentPage === 'human-in-loop' }]}>Human-in-the-Loop</a></li>
+                    <li><a href={`${base}docs/knowledge-store`} class:list={[{ active: currentPage === 'knowledge-store' }]}>Knowledge Store</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <h4 class="sidebar-title">Reference</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="https://pkg.go.dev/github.com/felixgeelhaar/agent-go" target="_blank">API Reference ↗</a></li>
+                    <li><a href="https://github.com/felixgeelhaar/agent-go" target="_blank">GitHub ↗</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="docs-content">
+            <article class="docs-article">
+                <header class="article-header">
+                    <span class="article-tag">// {section.toUpperCase()}</span>
+                    <h1>{title}</h1>
+                    {description && <p class="article-lead">{description}</p>}
+                </header>
+                <slot />
+            </article>
+        </main>
+    </div>
+
+    <footer class="footer docs-footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-bracket">[</span>
+                    <span class="logo-text">agent-go</span>
+                    <span class="logo-bracket">]</span>
+                </div>
+                <div class="footer-links">
+                    <a href={base}>Home</a>
+                    <a href="https://github.com/felixgeelhaar/agent-go" target="_blank">GitHub</a>
+                </div>
+                <div class="footer-meta">
+                    <span>MIT License</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
+
+<style is:global>
+@import '../styles/global.css';
+
+/* Navigation */
+.nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(10, 14, 20, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-primary);
+    z-index: 100;
+}
+
+.nav-inner {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--space-xl);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.logo-bracket {
+    color: var(--accent-cyan);
+}
+
+.logo-text {
+    color: var(--text-primary);
+}
+
+.logo-version {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: var(--space-sm);
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.nav-links a {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+    color: var(--accent-cyan);
+}
+
+.nav-github {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+}
+
+.nav-github:hover {
+    color: var(--accent-cyan);
+}
+
+/* Docs Layout */
+.docs-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+    padding-top: 60px;
+}
+
+/* Sidebar */
+.docs-sidebar {
+    position: sticky;
+    top: 60px;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    padding: var(--space-xl);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    z-index: 10;
+}
+
+.sidebar-section {
+    margin-bottom: var(--space-xl);
+}
+
+.sidebar-title {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+    padding-left: var(--space-sm);
+}
+
+.sidebar-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-nav li {
+    margin-bottom: 2px;
+}
+
+.sidebar-nav a {
+    display: block;
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+    border-left: 2px solid transparent;
+    text-decoration: none;
+}
+
+.sidebar-nav a:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.sidebar-nav a.active {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-dim);
+    border-left-color: var(--accent-cyan);
+}
+
+/* Main Content */
+.docs-content {
+    padding: var(--space-2xl) var(--space-3xl);
+    max-width: 900px;
+}
+
+.docs-article {
+    position: relative;
+    z-index: 1;
+}
+
+/* Article Header */
+.article-header {
+    margin-bottom: var(--space-3xl);
+    padding-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.article-tag {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
+    margin-bottom: var(--space-sm);
+    letter-spacing: 0.05em;
+    font-family: var(--font-mono);
+}
+
+.article-header h1 {
+    margin-bottom: var(--space-md);
+}
+
+.article-lead {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+}
+
+/* Article Content */
+.docs-article :global(h2) {
+    margin-top: var(--space-3xl);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.docs-article :global(h3) {
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+}
+
+.docs-article :global(p) {
+    margin-bottom: var(--space-md);
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.docs-article :global(ul),
+.docs-article :global(ol) {
+    margin-bottom: var(--space-md);
+    padding-left: var(--space-xl);
+}
+
+.docs-article :global(li) {
+    margin-bottom: var(--space-sm);
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.docs-article :global(li::marker) {
+    color: var(--accent-cyan);
+}
+
+.docs-article :global(pre) {
+    margin: var(--space-lg) 0;
+    padding: var(--space-lg);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.7;
+}
+
+.docs-article :global(pre code) {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* Callouts */
+.docs-article :global(.callout) {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    margin: var(--space-xl) 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-cyan);
+}
+
+.docs-article :global(.callout-warning) {
+    border-left-color: var(--accent-amber);
+    background: rgba(255, 176, 0, 0.05);
+}
+
+.docs-article :global(.callout-danger) {
+    border-left-color: var(--accent-red);
+    background: rgba(248, 81, 73, 0.05);
+}
+
+/* Footer */
+.footer {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+    padding: var(--space-2xl) 0;
+}
+
+.docs-footer {
+    margin-left: 260px;
+}
+
+.footer-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+}
+
+.footer-brand {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+}
+
+.footer-links {
+    display: flex;
+    gap: var(--space-lg);
+}
+
+.footer-links a {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    color: var(--accent-cyan);
+}
+
+.footer-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Custom scrollbar for sidebar */
+.docs-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 3px;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .docs-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .docs-sidebar {
+        display: none;
+    }
+
+    .docs-content {
+        padding: var(--space-xl);
+    }
+
+    .docs-footer {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-links a:not(.nav-github) {
+        display: none;
+    }
+
+    .docs-content {
+        padding: var(--space-md);
+    }
+}
+</style>

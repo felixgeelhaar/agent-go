@@ -1,0 +1,251 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+// Code snippets stored as raw HTML to avoid Astro parsing curly braces
+const step1Code = `<pre><code><span class="keyword">package</span> main
+
+<span class="keyword">import</span> (
+    <span class="string">"context"</span>
+    <span class="string">"encoding/json"</span>
+    <span class="string">"os"</span>
+
+    api <span class="string">"github.com/felixgeelhaar/agent-go/interfaces/api"</span>
+    <span class="string">"github.com/felixgeelhaar/agent-go/domain/tool"</span>
+)
+
+<span class="keyword">type</span> ReadFileInput <span class="keyword">struct</span> {
+    Path <span class="keyword">string</span> <span class="string">\`json:"path"\`</span>
+}
+
+<span class="keyword">var</span> readFileTool = api.NewToolBuilder(<span class="string">"read_file"</span>).
+    WithDescription(<span class="string">"Reads the contents of a file"</span>).
+    WithAnnotations(api.Annotations{
+        ReadOnly: <span class="keyword">true</span>,        <span class="comment">// No side effects</span>
+        Cacheable: <span class="keyword">true</span>,       <span class="comment">// Results can be cached</span>
+        RiskLevel: <span class="number">1</span>,          <span class="comment">// Low risk</span>
+    }).
+    WithExecutor(<span class="keyword">func</span>(ctx context.Context, input json.RawMessage) (tool.Result, error) {
+        <span class="keyword">var</span> req ReadFileInput
+        <span class="keyword">if</span> err := json.Unmarshal(input, &amp;req); err != <span class="keyword">nil</span> {
+            <span class="keyword">return</span> tool.Result{}, err
+        }
+
+        data, err := os.ReadFile(req.Path)
+        <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+            <span class="keyword">return</span> tool.Result{}, err
+        }
+
+        <span class="keyword">return</span> tool.Result{
+            Output: json.RawMessage(<span class="string">\`{"content": "\`</span> + <span class="keyword">string</span>(data) + <span class="string">\`"}\`</span>),
+        }, <span class="keyword">nil</span>
+    }).
+    Build()</code></pre>`;
+
+const step2Code = `<pre><code><span class="comment">// Create tool registry</span>
+registry := api.NewToolRegistry()
+registry.Register(readFileTool)
+
+<span class="comment">// Configure tool eligibility per state</span>
+eligibility := api.NewToolEligibility()
+eligibility.Allow(api.StateExplore, <span class="string">"read_file"</span>)  <span class="comment">// Only in explore state</span>
+
+<span class="comment">// Set up budgets to limit operations</span>
+budgets := <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">int</span>{
+    <span class="string">"tool_calls"</span>: <span class="number">50</span>,   <span class="comment">// Max 50 tool calls per run</span>
+    <span class="string">"tokens"</span>:     <span class="number">10000</span>, <span class="comment">// Max 10k tokens</span>
+}</code></pre>`;
+
+const step3Code = `<pre><code><span class="keyword">func</span> main() {
+    ctx := context.Background()
+
+    <span class="comment">// Build the engine with all configuration</span>
+    engine, err := api.New(
+        api.WithRegistry(registry),
+        api.WithPlanner(myPlanner),              <span class="comment">// Your planner implementation</span>
+        api.WithToolEligibility(eligibility),
+        api.WithTransitions(api.DefaultTransitions()),
+        api.WithBudgets(budgets),
+        api.WithMaxSteps(<span class="number">100</span>),
+    )
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.Fatal(err)
+    }
+
+    <span class="comment">// Run the agent with a goal</span>
+    run, err := engine.Run(ctx, <span class="string">"Read and summarize the config.yaml file"</span>)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        log.Fatal(err)
+    }
+
+    fmt.Printf(<span class="string">"Final state: %s\\n"</span>, run.State)
+    fmt.Printf(<span class="string">"Result: %s\\n"</span>, run.Result)
+}</code></pre>`;
+
+const step4Code = `<pre><code><span class="keyword">func</span> TestFileOpsAgent(t *testing.T) {
+    <span class="comment">// Define expected behavior</span>
+    planner := api.NewScriptedPlanner(
+        api.ScriptStep{
+            ExpectState: api.StateIntake,
+            Decision:    api.NewTransitionDecision(api.StateExplore, <span class="string">"begin exploration"</span>),
+        },
+        api.ScriptStep{
+            ExpectState: api.StateExplore,
+            Decision:    api.NewCallToolDecision(<span class="string">"read_file"</span>,
+                json.RawMessage(<span class="string">\`{"path": "config.yaml"}\`</span>),
+                <span class="string">"reading config"</span>),
+        },
+        api.ScriptStep{
+            ExpectState: api.StateExplore,
+            Decision:    api.NewFinishDecision(<span class="string">"analysis complete"</span>,
+                json.RawMessage(<span class="string">\`{"summary": "config loaded"}\`</span>)),
+        },
+    )
+
+    engine, _ := api.New(
+        api.WithPlanner(planner),
+        api.WithRegistry(registry),
+        api.WithToolEligibility(eligibility),
+        api.WithTransitions(api.DefaultTransitions()),
+    )
+
+    run, err := engine.Run(context.Background(), <span class="string">"Analyze config"</span>)
+    <span class="keyword">if</span> err != <span class="keyword">nil</span> {
+        t.Fatalf(<span class="string">"unexpected error: %v"</span>, err)
+    }
+
+    <span class="keyword">if</span> run.State != api.StateDone {
+        t.Errorf(<span class="string">"expected done, got %s"</span>, run.State)
+    }
+}</code></pre>`;
+---
+
+<DocsLayout
+    title="Quickstart"
+    description="Build your first agent in minutes with a step-by-step guide."
+    currentPage="quickstart"
+>
+    <section class="article-section">
+        <h2>Overview</h2>
+        <p>
+            In this guide, we'll build a simple file operations agent that can read and analyze files.
+            You'll learn how to define tools, configure policies, and run an agent.
+        </p>
+    </section>
+
+    <section class="article-section">
+        <h2>Step 1: Define a Tool</h2>
+        <p>Tools are the capabilities your agent can use. Each tool has annotations that influence how it's executed.</p>
+        <div class="code-block-docs" set:html={step1Code} />
+    </section>
+
+    <section class="article-section">
+        <h2>Step 2: Create a Registry and Policies</h2>
+        <p>Register your tools and configure which states they can be used in.</p>
+        <div class="code-block-docs" set:html={step2Code} />
+    </section>
+
+    <section class="article-section">
+        <h2>Step 3: Create an Engine</h2>
+        <p>The engine orchestrates agent execution according to your configuration.</p>
+        <div class="code-block-docs" set:html={step3Code} />
+    </section>
+
+    <section class="article-section">
+        <h2>Step 4: Test Without LLMs</h2>
+        <p>Use the ScriptedPlanner for deterministic tests that don't require API calls.</p>
+        <div class="code-block-docs" set:html={step4Code} />
+    </section>
+
+    <section class="article-section">
+        <h2>What's Next?</h2>
+        <ul>
+            <li><a href={`${base}docs/concepts`}>Core Concepts</a> - Deep dive into the architecture</li>
+            <li><a href={`${base}docs/states`}>State Machine</a> - Understand the canonical states</li>
+            <li><a href={`${base}docs/tools`}>Tools</a> - Advanced tool patterns and annotations</li>
+            <li><a href={`${base}docs/policies`}>Policies</a> - Configure budgets and approvals</li>
+        </ul>
+    </section>
+
+    <nav class="page-nav">
+        <a href={`${base}docs/installation`} class="page-nav-prev">
+            <span class="page-nav-label">Previous</span>
+            <span class="page-nav-title">← Installation</span>
+        </a>
+        <a href={`${base}docs/concepts`} class="page-nav-next">
+            <span class="page-nav-label">Next</span>
+            <span class="page-nav-title">Core Concepts →</span>
+        </a>
+    </nav>
+</DocsLayout>
+
+<style>
+.article-section {
+    margin-bottom: var(--space-3xl);
+}
+
+.code-block-docs {
+    margin: var(--space-lg) 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.code-block-docs :global(pre) {
+    padding: var(--space-lg);
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    overflow-x: auto;
+}
+
+.code-block-docs :global(code) {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* Syntax highlighting */
+:global(.keyword) { color: var(--accent-purple); }
+:global(.string) { color: var(--accent-green); }
+:global(.comment) { color: var(--text-muted); font-style: italic; }
+:global(.number) { color: var(--accent-amber); }
+
+.page-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border-primary);
+}
+
+.page-nav-prev,
+.page-nav-next {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    text-decoration: none;
+}
+
+.page-nav-next {
+    text-align: right;
+}
+
+.page-nav-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.page-nav-title {
+    font-size: 0.9rem;
+    color: var(--accent-cyan);
+    font-weight: 500;
+}
+
+.page-nav a:hover .page-nav-title {
+    color: var(--text-primary);
+}
+</style>
