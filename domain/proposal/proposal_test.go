@@ -78,8 +78,8 @@ func TestAddChange_SucceedsInDraft(t *testing.T) {
 
 func TestAddChange_FailsIfNotDraft(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool1"})
-	p.Submit("submitter")
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool1"})
+	_ = p.Submit("submitter")
 
 	err := p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool2"})
 	if err != ErrCannotModifyNonDraft {
@@ -138,7 +138,7 @@ func TestAddNote_AddsNote(t *testing.T) {
 
 func TestSubmit_TransitionsFromDraft(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
 
 	err := p.Submit("submitter")
 	if err != nil {
@@ -167,9 +167,9 @@ func TestSubmit_FailsWithNoChanges(t *testing.T) {
 
 func TestSubmit_FailsFromNonDraftStatus(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
-	p.Submit("submitter")
-	p.Approve("approver", "approved")
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
+	_ = p.Submit("submitter")
+	_ = p.Approve("approver", "approved")
 
 	err := p.Submit("another")
 	if err != ErrInvalidStatusTransition {
@@ -179,8 +179,8 @@ func TestSubmit_FailsFromNonDraftStatus(t *testing.T) {
 
 func TestApprove_TransitionsFromPendingReview(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
-	p.Submit("submitter")
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
+	_ = p.Submit("submitter")
 
 	err := p.Approve("approver", "Looks good")
 	if err != nil {
@@ -255,9 +255,9 @@ func TestReject_RequiresHumanActor(t *testing.T) {
 
 func TestApply_TransitionsFromApproved(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
-	p.Submit("submitter")
-	p.Approve("approver", "approved")
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
+	_ = p.Submit("submitter")
+	_ = p.Approve("approver", "approved")
 
 	err := p.Apply(0, 1)
 	if err != nil {
@@ -291,10 +291,10 @@ func TestApply_FailsFromNonApprovedStatus(t *testing.T) {
 
 func TestRollback_TransitionsFromApplied(t *testing.T) {
 	p := NewProposal("test", "test", "creator")
-	p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
-	p.Submit("submitter")
-	p.Approve("approver", "approved")
-	p.Apply(0, 1)
+	_ = p.AddChange(PolicyChange{Type: ChangeTypeEligibility, Target: "tool"})
+	_ = p.Submit("submitter")
+	_ = p.Approve("approver", "approved")
+	_ = p.Apply(0, 1)
 
 	err := p.Rollback("Caused issues")
 	if err != nil {

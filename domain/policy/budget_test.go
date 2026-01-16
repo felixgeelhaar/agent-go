@@ -94,9 +94,9 @@ func TestBudget_Consume(t *testing.T) {
 	t.Run("multiple consumptions", func(t *testing.T) {
 		budget := NewBudget(map[string]int{"calls": 10})
 
-		budget.Consume("calls", 3)
-		budget.Consume("calls", 4)
-		budget.Consume("calls", 2)
+		_ = budget.Consume("calls", 3)
+		_ = budget.Consume("calls", 4)
+		_ = budget.Consume("calls", 2)
 
 		if budget.Remaining("calls") != 1 {
 			t.Errorf("Budget.Remaining() = %d, want 1", budget.Remaining("calls"))
@@ -115,8 +115,8 @@ func TestBudget_Snapshot(t *testing.T) {
 		"tokens": 100,
 	})
 
-	budget.Consume("calls", 3)
-	budget.Consume("tokens", 40)
+	_ = budget.Consume("calls", 3)
+	_ = budget.Consume("tokens", 40)
 
 	snapshot := budget.Snapshot()
 
@@ -136,7 +136,7 @@ func TestBudget_Snapshot(t *testing.T) {
 
 func TestBudget_Reset(t *testing.T) {
 	budget := NewBudget(map[string]int{"calls": 10})
-	budget.Consume("calls", 7)
+	_ = budget.Consume("calls", 7)
 
 	budget.Reset()
 
@@ -166,7 +166,7 @@ func TestBudget_IsExhausted(t *testing.T) {
 		t.Error("Budget.IsExhausted() should be false initially")
 	}
 
-	budget.Consume("calls", 3)
+	_ = budget.Consume("calls", 3)
 	if !budget.IsExhausted() {
 		t.Error("Budget.IsExhausted() should be true after full consumption")
 	}
@@ -178,7 +178,7 @@ func TestBudget_ExhaustedBudgets(t *testing.T) {
 		"tokens": 100,
 	})
 
-	budget.Consume("calls", 3)
+	_ = budget.Consume("calls", 3)
 
 	exhausted := budget.ExhaustedBudgets()
 	if len(exhausted) != 1 || exhausted[0] != "calls" {
@@ -196,7 +196,7 @@ func TestBudget_Concurrency(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 10; j++ {
 				budget.CanConsume("calls", 1)
-				budget.Consume("calls", 1)
+				_ = budget.Consume("calls", 1)
 				budget.Remaining("calls")
 				budget.Snapshot()
 			}
