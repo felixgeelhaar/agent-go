@@ -38,7 +38,7 @@ func Budget(cfg BudgetConfig) middleware.Middleware {
 
 			// Consume budget only on success
 			if err == nil {
-				cfg.Budget.Consume(cfg.BudgetName, cfg.Amount)
+				_ = cfg.Budget.Consume(cfg.BudgetName, cfg.Amount)
 			}
 
 			return result, err

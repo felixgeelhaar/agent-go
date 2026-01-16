@@ -85,9 +85,8 @@ func Init(config Config) {
 
 // Get returns the default logger, initializing if necessary.
 func Get() *bolt.Logger {
-	if defaultLogger == nil {
-		Init(DefaultConfig())
-	}
+	// Always call Init - it's safe because of sync.Once
+	Init(DefaultConfig())
 	return defaultLogger
 }
 
