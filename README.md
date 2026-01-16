@@ -1,562 +1,420 @@
 # agent-go
 
-A **state-driven agent runtime** built with Domain-Driven Design (DDD) principles in Go. This framework provides a robust foundation for building AI agents with explicit state management, tool orchestration, and policy enforcement.
+[![Go Reference](https://pkg.go.dev/badge/github.com/felixgeelhaar/agent-go.svg)](https://pkg.go.dev/github.com/felixgeelhaar/agent-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/felixgeelhaar/agent-go)](https://goreportcard.com/report/github.com/felixgeelhaar/agent-go)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+**Build trustworthy AI agents in Go.** A state-driven runtime where intelligence is constrained by design, not hope.
 
-### Core Runtime
-- **State Machine Core**: 7-state agent lifecycle (intake → explore → decide → act → validate → done/failed)
-- **Tool Orchestration**: Registry-based tool management with schema validation
-- **Policy Enforcement**: Budget limits, approval workflows, and tool eligibility rules
-- **Resilience Patterns**: Circuit breaker, retry, and bulkhead via [fortify](https://github.com/felixgeelhaar/fortify)
-- **Structured Logging**: High-performance logging via [bolt](https://github.com/felixgeelhaar/bolt)
-- **Audit Trail**: Complete ledger of all decisions, tool calls, and state transitions
-- **Pluggable Planners**: Swap planning strategies (mock, scripted, LLM-based)
+```go
+engine, _ := agent.New(
+    agent.WithTools(readFile, writeFile),
+    agent.WithPlanner(llmPlanner),
+    agent.WithBudget("tool_calls", 50),
+)
 
-### Governed Adaptivity (Horizon 3)
-- **Pattern Detection**: Detect behavioral patterns across runs (tool sequences, failures, performance)
-- **Suggestion Generation**: Generate policy improvement suggestions from detected patterns
-- **Proposal Workflow**: Human-governed policy evolution with approval workflow
-- **Policy Versioning**: Immutable version history with rollback capability
-- **Visual Inspectors**: Export run data, state machines, and metrics for visualization
+run, _ := engine.Run(ctx, "Summarize all markdown files in ./docs")
+```
 
-## Installation
+---
+
+## Why agent-go?
+
+Most agent frameworks treat safety as an afterthought. agent-go makes **trust the product**:
+
+| Problem | agent-go Solution |
+|---------|-------------------|
+| Agents run arbitrary code | **State machine** constrains what tools run when |
+| No visibility into decisions | **Audit ledger** records every action |
+| Runaway costs | **Budget enforcement** with hard limits |
+| Dangerous operations | **Approval workflows** for destructive tools |
+| Untestable LLM behavior | **Deterministic mode** with scripted planners |
+| Python's GIL limits scale | **Native Go concurrency** for high throughput |
+
+**The key insight**: Structure agent behavior through constraints, not prompts.
+
+---
+
+## Quick Start
+
+### Installation
 
 ```bash
 go get github.com/felixgeelhaar/agent-go
 ```
 
-## Quick Start
+### Your First Agent (5 minutes)
 
 ```go
 package main
 
 import (
     "context"
+    "encoding/json"
     "fmt"
     "log"
 
     agent "github.com/felixgeelhaar/agent-go/interfaces/api"
+    "github.com/felixgeelhaar/agent-go/domain/tool"
 )
 
 func main() {
-    // Create engine with tools
-    engine, err := agent.NewEngine(
-        agent.WithTool(myReadTool),
-        agent.WithTool(myWriteTool),
-        agent.WithPlanner(myPlanner),
-        agent.WithMaxSteps(50),
+    // 1. Create a simple tool
+    greetTool := agent.NewToolBuilder("greet").
+        WithDescription("Greets a person by name").
+        WithAnnotations(agent.Annotations{ReadOnly: true}).
+        WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
+            var in struct{ Name string `json:"name"` }
+            json.Unmarshal(input, &in)
+            output, _ := json.Marshal(map[string]string{
+                "message": fmt.Sprintf("Hello, %s!", in.Name),
+            })
+            return tool.Result{Output: output}, nil
+        }).
+        MustBuild()
+
+    // 2. Create a scripted planner (for testing - swap with LLM in production)
+    planner := agent.NewScriptedPlanner(
+        agent.ScriptStep{
+            ExpectState: agent.StateIntake,
+            Decision:    agent.NewTransitionDecision(agent.StateExplore, "starting"),
+        },
+        agent.ScriptStep{
+            ExpectState: agent.StateExplore,
+            Decision:    agent.NewCallToolDecision("greet", json.RawMessage(`{"name":"World"}`), "greeting user"),
+        },
+        agent.ScriptStep{
+            ExpectState: agent.StateExplore,
+            Decision:    agent.NewFinishDecision("completed", json.RawMessage(`{"status":"done"}`)),
+        },
+    )
+
+    // 3. Build and run the engine
+    engine, err := agent.New(
+        agent.WithTool(greetTool),
+        agent.WithPlanner(planner),
+        agent.WithMaxSteps(10),
     )
     if err != nil {
         log.Fatal(err)
     }
 
-    // Run agent with a goal
-    run, err := engine.Run(context.Background(), "Process the input file")
+    run, err := engine.Run(context.Background(), "Say hello")
     if err != nil {
         log.Fatal(err)
     }
 
-    fmt.Printf("Run completed: %s\n", run.Status)
-    fmt.Printf("Result: %v\n", run.Result)
+    fmt.Printf("Status: %s\n", run.Status)
+    fmt.Printf("Result: %s\n", run.Result)
 }
 ```
+
+Run it:
+```bash
+go run main.go
+# Output:
+# Status: done
+# Result: {"status":"done"}
+```
+
+---
+
+## Core Concepts
+
+### State Machine
+
+Agents operate within a **canonical 7-state lifecycle**. Each state has explicit semantics:
+
+```
+intake → explore → decide → act → validate → done
+                     ↓                  ↓
+                  failed ←──────────────┘
+```
+
+| State | Purpose | Side Effects |
+|-------|---------|--------------|
+| `intake` | Parse and normalize the goal | None |
+| `explore` | Gather information (read-only tools) | None |
+| `decide` | Choose next action | None |
+| `act` | Execute side-effecting tools | **Yes** |
+| `validate` | Verify results | None |
+| `done` | Success (terminal) | None |
+| `failed` | Failure (terminal) | None |
+
+**Why this matters**: A tool marked `Destructive` can only run in `act` state. Period.
+
+### Tools
+
+Tools are the agent's capabilities. Each tool declares its behavior through **annotations**:
+
+```go
+writeTool := agent.NewToolBuilder("write_file").
+    WithAnnotations(agent.Annotations{
+        ReadOnly:    false,      // Modifies state
+        Destructive: true,       // May cause irreversible changes
+        Idempotent:  false,      // Not safe to retry
+        RiskLevel:   agent.RiskHigh,
+    }).
+    WithHandler(writeHandler).
+    MustBuild()
+```
+
+Annotations drive runtime behavior:
+- `ReadOnly` tools can run in `explore` and `validate`
+- `Destructive` tools require approval (if configured)
+- `Idempotent` tools get automatic retry on failure
+- `Cacheable` results are memoized
+
+### Planners
+
+Planners decide what the agent does next. **Swap implementations without changing agent code**:
+
+```go
+// Testing: deterministic, no LLM needed
+planner := agent.NewScriptedPlanner(steps...)
+
+// Development: local models via Ollama
+planner, _ := ollama.New(ollama.WithModel("llama3"))
+
+// Production: Claude, GPT-4, Gemini
+planner, _ := anthropic.New(anthropic.WithModel("claude-sonnet-4-20250514"))
+```
+
+### Policies
+
+Hard limits that **cannot be overridden by the LLM**:
+
+```go
+engine, _ := agent.New(
+    // Budget: Stop after 100 tool calls, no matter what
+    agent.WithBudget("tool_calls", 100),
+
+    // Approval: Human must approve destructive operations
+    agent.WithApprover(myApprover),
+
+    // Eligibility: read_file only in explore, write_file only in act
+    agent.WithToolEligibility(eligibility),
+)
+```
+
+---
+
+## Features
+
+### LLM Providers
+
+Pluggable providers for all major LLMs:
+
+```go
+import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/anthropic"
+import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/openai"
+import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/gemini"
+import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/ollama"
+
+// Each provider implements the same interface
+provider, _ := anthropic.New(anthropic.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")))
+provider, _ := openai.New(openai.WithAPIKey(os.Getenv("OPENAI_API_KEY")))
+provider, _ := gemini.New(gemini.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+provider, _ := ollama.New(ollama.WithBaseURL("http://localhost:11434"))
+```
+
+### Domain Packs
+
+Pre-built tool collections for common domains:
+
+```go
+import "github.com/felixgeelhaar/agent-go/pack/database"
+import "github.com/felixgeelhaar/agent-go/pack/git"
+import "github.com/felixgeelhaar/agent-go/pack/kubernetes"
+import "github.com/felixgeelhaar/agent-go/pack/cloud"
+
+// Database: query, execute, schema inspection
+dbPack := database.New(db, database.WithMaxRows(1000))
+
+// Git: status, log, diff, commit
+gitPack := git.New("/path/to/repo", git.WithAllowCommit(true))
+
+// Kubernetes: get, list, logs, apply
+k8sPack := kubernetes.New(client, kubernetes.WithNamespace("production"))
+
+// Cloud: S3/GCS/Azure blob operations
+cloudPack := cloud.New(provider, cloud.WithBucket("my-bucket"))
+```
+
+### Observability
+
+OpenTelemetry integration for traces and metrics:
+
+```go
+import "github.com/felixgeelhaar/agent-go/infrastructure/observability"
+
+tracer, _ := observability.NewTracer("my-agent",
+    observability.WithOTLPEndpoint("localhost:4317"),
+)
+
+engine, _ := agent.New(
+    agent.WithMiddleware(observability.TracingMiddleware(tracer)),
+)
+
+// Automatic spans for: tool execution, state transitions, planner calls
+// Automatic metrics for: tool_duration, run_duration, budget_usage
+```
+
+### Security
+
+Input validation, secret management, and audit logging:
+
+```go
+import "github.com/felixgeelhaar/agent-go/infrastructure/security/validation"
+import "github.com/felixgeelhaar/agent-go/infrastructure/security/secrets"
+import "github.com/felixgeelhaar/agent-go/infrastructure/security/audit"
+
+// Validate tool inputs
+validator := validation.NewValidator(
+    validation.WithRule("path", validation.NoPathTraversal()),
+    validation.WithRule("query", validation.NoSQLInjection()),
+)
+
+// Manage secrets
+secretMgr := secrets.NewEnvManager(secrets.WithPrefix("AGENT_"))
+
+// Audit all operations
+auditor := audit.NewLogger(audit.WithOutput(auditFile))
+```
+
+### Distributed Execution
+
+Scale across multiple workers:
+
+```go
+import "github.com/felixgeelhaar/agent-go/infrastructure/distributed"
+import "github.com/felixgeelhaar/agent-go/infrastructure/distributed/queue"
+import "github.com/felixgeelhaar/agent-go/infrastructure/distributed/lock"
+
+// Create queue (memory for dev, Redis/NATS for prod)
+q := queue.NewMemoryQueue()
+
+// Create distributed lock
+l := lock.NewMemoryLock()
+
+// Start workers
+worker := distributed.NewWorker(distributed.WorkerConfig{
+    Queue:       q,
+    Lock:        l,
+    Concurrency: 4,
+})
+worker.Start(ctx)
+```
+
+---
 
 ## Architecture
 
 ```
 agent-go/
-├── domain/                 # Core domain layer (no external dependencies)
-│   ├── agent/              # Agent aggregate: Run, State, Decision, Evidence
-│   ├── tool/               # Tool aggregate: Tool, Annotations, Schema, Registry
-│   ├── policy/             # Policy subdomain: Budget, Approval, Constraints, Versioning
-│   ├── ledger/             # Audit subdomain: Ledger, Entry, Events
-│   ├── artifact/           # Artifact subdomain: Ref, Store
-│   ├── pattern/            # Pattern detection: Pattern, Detector, Evidence
-│   ├── suggestion/         # Suggestion generation: Suggestion, Generator
-│   ├── proposal/           # Policy evolution: Proposal, Status, Changes
-│   ├── event/              # Event sourcing: Event, Store
-│   ├── run/                # Run management: Run, Store
-│   └── inspector/          # Inspection: Inspector, Export formats
+├── domain/                    # Core domain (no external deps)
+│   ├── agent/                 # Run, State, Decision, Evidence
+│   ├── tool/                  # Tool, Annotations, Schema, Registry
+│   ├── policy/                # Budget, Approval, Eligibility
+│   └── ledger/                # Audit trail
 │
-├── application/            # Application layer (orchestration)
-│   ├── engine.go           # Main engine service
-│   ├── detection.go        # Pattern detection service
-│   ├── evolution.go        # Policy evolution service
-│   └── inspection.go       # Inspection service
+├── application/               # Orchestration
+│   └── engine.go              # Main engine service
 │
-├── infrastructure/         # Infrastructure layer (implementations)
-│   ├── statemachine/       # Statekit integration
-│   ├── resilience/         # Fortify integration (circuit breaker, retry)
-│   ├── logging/            # Bolt integration
-│   ├── storage/            # Memory and filesystem stores
-│   ├── planner/            # Planner implementations
-│   ├── pattern/            # Pattern detectors (sequence, failure, performance)
-│   ├── suggestion/         # Suggestion generators (eligibility, budget)
-│   ├── proposal/           # Proposal workflow and policy applier
-│   ├── inspector/          # Exporters (JSON, DOT, Mermaid, metrics)
-│   └── analytics/          # Run analytics and aggregation
+├── infrastructure/            # Implementations
+│   ├── planner/provider/      # LLM providers
+│   ├── observability/         # OpenTelemetry
+│   ├── security/              # Validation, secrets, audit
+│   ├── distributed/           # Queues, locks, workers
+│   └── resilience/            # Circuit breaker, retry
 │
-├── interfaces/             # Interface adapters
-│   └── api/                # Public API and builders
+├── interfaces/api/            # Public API
 │
-└── example/                # Example applications
-    └── fileops/            # File operations demo
+├── pack/                      # Domain tool packs
+│   ├── database/
+│   ├── git/
+│   ├── kubernetes/
+│   └── cloud/
+│
+└── example/                   # Examples
 ```
 
-## State Machine
-
-The agent operates through a well-defined state machine:
-
-```
-┌─────────┐
-│  intake │ ──────────────────────────────┐
-└────┬────┘                               │
-     │                                    │
-     ▼                                    │
-┌─────────┐                               │
-│ explore │ ◄─────────────────────────────┤
-└────┬────┘                               │
-     │                                    │
-     ▼                                    │
-┌─────────┐     ┌──────┐                  │
-│ decide  │ ───►│ done │                  │
-└────┬────┘     └──────┘                  │
-     │               ▲                    │
-     ▼               │                    │
-┌─────────┐          │                    │
-│   act   │ ─────────┤                    │
-└────┬────┘          │                    │
-     │               │                    │
-     ▼               │                    │
-┌──────────┐         │      ┌────────┐    │
-│ validate │ ────────┴─────►│ failed │◄───┘
-└──────────┘                └────────┘
-```
-
-### State Semantics
-
-| State | Description | Side Effects Allowed |
-|-------|-------------|---------------------|
-| `intake` | Initial state, goal parsing | No |
-| `explore` | Information gathering | Read-only |
-| `decide` | Planning next action | No |
-| `act` | Execute tools | Yes |
-| `validate` | Verify results | Read-only |
-| `done` | Successful completion | No |
-| `failed` | Terminal failure | No |
-
-## Tools
-
-Tools are the agent's capabilities. Each tool has:
-- **Name**: Unique identifier
-- **Schema**: JSON Schema for input/output validation
-- **Annotations**: Behavioral metadata
-- **Handler**: Execution function
-
-### Creating Tools
-
-```go
-import (
-    "github.com/felixgeelhaar/agent-go/interfaces/api"
-    "github.com/felixgeelhaar/agent-go/domain/tool"
-)
-
-readFile := api.NewToolBuilder("read_file").
-    WithDescription("Reads content from a file").
-    WithAnnotations(api.Annotations{
-        ReadOnly:   true,
-        Idempotent: true,
-        Cacheable:  true,
-        RiskLevel:  api.RiskLow,
-    }).
-    WithInputSchema(tool.NewSchema(json.RawMessage(`{
-        "type": "object",
-        "properties": {
-            "path": {"type": "string"}
-        },
-        "required": ["path"]
-    }`))).
-    WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
-        var in struct{ Path string `json:"path"` }
-        json.Unmarshal(input, &in)
-
-        content, err := os.ReadFile(in.Path)
-        if err != nil {
-            return tool.Result{}, err
-        }
-
-        output, _ := json.Marshal(map[string]any{"content": string(content)})
-        return tool.Result{Output: output}, nil
-    }).
-    MustBuild()
-```
-
-### Tool Annotations
-
-| Annotation | Description |
-|------------|-------------|
-| `ReadOnly` | Tool doesn't modify state |
-| `Destructive` | Tool may cause irreversible changes |
-| `Idempotent` | Safe to retry on failure |
-| `Cacheable` | Results can be cached |
-| `RiskLevel` | None, Low, Medium, High, Critical |
-
-## Planners
-
-Planners decide what action the agent should take. Implement the `Planner` interface:
-
-```go
-type Planner interface {
-    Plan(ctx context.Context, req PlanRequest) (Decision, error)
-}
-
-type PlanRequest struct {
-    RunID        string
-    CurrentState State
-    Evidence     []Evidence
-    AllowedTools []string
-    Budgets      BudgetSnapshot
-    Vars         map[string]any
-}
-```
-
-### Built-in Planners
-
-- **MockPlanner**: Returns pre-configured decisions (testing)
-- **ScriptedPlanner**: Follows a script of decisions (deterministic tests)
-
-## Policy Enforcement
-
-### Budgets
-
-Limit resource consumption:
-
-```go
-engine, _ := agent.NewEngine(
-    agent.WithBudget("tool_calls", 100),
-    agent.WithBudget("tokens", 50000),
-)
-```
-
-### Approval Workflow
-
-Require human approval for high-risk operations:
-
-```go
-engine, _ := agent.NewEngine(
-    agent.WithApprover(myApprover),
-)
-
-// Tools with RiskHigh or Destructive=true will require approval
-```
-
-### Tool Eligibility
-
-Control which tools are available in each state:
-
-```go
-engine, _ := agent.NewEngine(
-    agent.WithToolEligibility(map[agent.State][]string{
-        agent.StateExplore: {"read_file", "list_dir"},
-        agent.StateAct:     {"read_file", "write_file", "delete_file"},
-    }),
-)
-```
-
-## Resilience
-
-The runtime uses [fortify](https://github.com/felixgeelhaar/fortify) for resilience:
-
-- **Circuit Breaker**: Prevents cascading failures
-- **Retry**: Automatic retry with exponential backoff (idempotent tools only)
-- **Bulkhead**: Limits concurrent tool executions
-- **Timeout**: Per-execution time limits
-
-```go
-engine, _ := agent.NewEngine(
-    agent.WithExecutorConfig(resilience.ExecutorConfig{
-        MaxConcurrent:           10,
-        CircuitBreakerThreshold: 5,
-        CircuitBreakerTimeout:   30 * time.Second,
-        RetryMaxAttempts:        3,
-        RetryInitialDelay:       100 * time.Millisecond,
-        DefaultTimeout:          30 * time.Second,
-    }),
-)
-```
-
-## Logging
-
-Structured logging via [bolt](https://github.com/felixgeelhaar/bolt):
-
-```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/logging"
-
-// Initialize with options
-logging.Init(bolt.WithLevel(bolt.LevelDebug))
-
-// Logs include: run_id, state, tool, decision, duration, etc.
-```
-
-## Governed Adaptivity (Horizon 3)
-
-Horizon 3 introduces human-governed learning capabilities. The system detects patterns across runs, generates improvement suggestions, and presents them through a proposal workflow requiring explicit human approval.
-
-**Key Constraint**: No unsupervised self-modification. All policy changes require explicit human approval.
-
-### Pattern Detection
-
-Detect behavioral patterns across runs:
-
-```go
-import (
-    "github.com/felixgeelhaar/agent-go/domain/pattern"
-    infra "github.com/felixgeelhaar/agent-go/infrastructure/pattern"
-)
-
-// Create pattern detectors
-sequenceDetector := infra.NewSequenceDetector(eventStore)
-failureDetector := infra.NewFailureDetector(eventStore)
-performanceDetector := infra.NewPerformanceDetector(eventStore)
-
-// Combine into composite detector
-detector := infra.NewCompositeDetector(
-    sequenceDetector,
-    failureDetector,
-    performanceDetector,
-)
-
-// Detect patterns
-patterns, err := detector.Detect(ctx, pattern.DetectionOptions{
-    MinConfidence: 0.7,
-    MinFrequency:  3,
-})
-```
-
-#### Pattern Types
-
-| Type | Description |
-|------|-------------|
-| `tool_sequence` | Repeated sequences of tool calls |
-| `recurring_failure` | Same failure modes across runs |
-| `tool_failure` | Tools consistently failing |
-| `budget_exhaustion` | Runs hitting budget limits |
-| `slow_tool` | Tool performance degradation |
-| `long_runs` | Runs exceeding expected duration |
-
-### Suggestion Generation
-
-Generate policy improvements from detected patterns:
-
-```go
-import (
-    "github.com/felixgeelhaar/agent-go/domain/suggestion"
-    infra "github.com/felixgeelhaar/agent-go/infrastructure/suggestion"
-)
-
-// Create generators
-eligibilityGen := infra.NewEligibilityGenerator()
-budgetGen := infra.NewBudgetGenerator()
-
-// Combine generators
-generator := infra.NewCompositeGenerator(eligibilityGen, budgetGen)
-
-// Generate suggestions from patterns
-suggestions, err := generator.Generate(ctx, patterns)
-
-for _, s := range suggestions {
-    fmt.Printf("Suggestion: %s\n", s.Title)
-    fmt.Printf("  Type: %s\n", s.Type)
-    fmt.Printf("  Confidence: %.2f\n", s.Confidence)
-    fmt.Printf("  Rationale: %s\n", s.Rationale)
-}
-```
-
-#### Suggestion Types
-
-| Type | Description |
-|------|-------------|
-| `add_eligibility` | Allow a tool in a new state |
-| `remove_eligibility` | Restrict tool from a state |
-| `increase_budget` | Increase budget limit |
-| `decrease_budget` | Decrease budget limit |
-| `require_approval` | Add approval requirement |
-
-### Proposal Workflow
-
-Convert suggestions into proposals requiring human approval:
-
-```go
-import (
-    "github.com/felixgeelhaar/agent-go/domain/proposal"
-    infra "github.com/felixgeelhaar/agent-go/infrastructure/proposal"
-)
-
-// Create workflow service
-workflow := infra.NewWorkflowService(
-    proposalStore,
-    versionStore,
-    eventPublisher,
-)
-
-// Create proposal from suggestion
-prop, err := workflow.CreateFromSuggestion(ctx, suggestion, "system")
-
-// Add custom changes
-err = workflow.AddChange(ctx, prop.ID, proposal.PolicyChange{
-    Type:   proposal.ChangeTypeAddEligibility,
-    Target: "explore",
-    Value:  "analyze_file",
-})
-
-// Submit for review
-err = workflow.Submit(ctx, prop.ID, "developer@example.com")
-
-// Approve (requires human actor)
-err = workflow.Approve(ctx, prop.ID, "admin@example.com", "Looks good")
-
-// Apply to policy
-err = workflow.Apply(ctx, prop.ID)
-
-// Rollback if needed
-err = workflow.Rollback(ctx, prop.ID, "Caused performance issues")
-```
-
-#### Proposal Status Flow
-
-```
-┌───────┐     ┌────────────────┐     ┌──────────┐     ┌─────────┐
-│ draft │────►│ pending_review │────►│ approved │────►│ applied │
-└───────┘     └────────────────┘     └──────────┘     └─────────┘
-    ▲                │                     │               │
-    │                ▼                     ▼               ▼
-    │          ┌──────────┐          ┌──────────┐   ┌─────────────┐
-    └──────────│ rejected │          │ rejected │   │ rolled_back │
-               └──────────┘          └──────────┘   └─────────────┘
-```
-
-### Policy Versioning
-
-Every policy change is versioned:
-
-```go
-import "github.com/felixgeelhaar/agent-go/domain/policy"
-
-// Get current version
-version, err := versionStore.GetCurrent(ctx)
-fmt.Printf("Policy Version: %d\n", version.Version)
-fmt.Printf("Last Modified: %s\n", version.CreatedAt)
-
-// List version history
-versions, err := versionStore.List(ctx)
-for _, v := range versions {
-    fmt.Printf("v%d - %s (proposal: %s)\n", v.Version, v.CreatedAt, v.ProposalID)
-}
-
-// Rollback to previous version
-err = workflow.Rollback(ctx, proposalID, "Rolling back to v2")
-```
-
-### Visual Inspectors
-
-Export run data for visualization:
-
-```go
-import (
-    "github.com/felixgeelhaar/agent-go/domain/inspector"
-    infra "github.com/felixgeelhaar/agent-go/infrastructure/inspector"
-)
-
-// Create exporters
-jsonExporter := infra.NewJSONExporter(runStore, eventStore, infra.WithPrettyPrint())
-dotExporter := infra.NewDOTExporter(eligibility, transitions)
-mermaidExporter := infra.NewMermaidExporter(eligibility, transitions)
-metricsExporter := infra.NewMetricsExporter(analytics)
-
-// Create inspector
-insp := infra.NewDefaultInspector(jsonExporter, dotExporter, metricsExporter)
-
-// Export run data as JSON
-jsonData, err := jsonExporter.ExportRun(ctx, runID)
-
-// Export state machine as DOT (Graphviz)
-dotData, err := dotExporter.ExportStateMachine(ctx)
-
-// Export state machine as Mermaid diagram
-mermaidData, err := mermaidExporter.ExportStateMachine(ctx)
-
-// Export metrics dashboard data
-metricsData, err := metricsExporter.ExportMetrics(ctx, analytics.Filter{})
-```
-
-#### Export Formats
-
-| Format | Use Case |
-|--------|----------|
-| JSON | Run details, events, tool calls for programmatic access |
-| DOT | State machine visualization in Graphviz |
-| Mermaid | State machine visualization in Markdown |
-| Metrics | Dashboard data (success rates, durations, tool usage) |
+---
+
+## Comparison
+
+| Feature | agent-go | LangChain | AutoGPT | CrewAI |
+|---------|----------|-----------|---------|--------|
+| Language | Go | Python | Python | Python |
+| Type Safety | Compile-time | Runtime | Runtime | Runtime |
+| State Machine | Built-in | Manual | None | None |
+| Policy Enforcement | First-class | Partial | None | Partial |
+| Audit Trail | Built-in | Manual | None | None |
+| Deterministic Testing | ScriptedPlanner | Difficult | Difficult | Difficult |
+| Concurrency | Native goroutines | GIL-limited | Limited | Limited |
+| Memory Footprint | ~10MB | ~100MB+ | ~200MB+ | ~150MB+ |
+
+---
+
+## Documentation
+
+- **[Quick Start Guide](docs/quickstart.md)** - Your first agent in 5 minutes
+- **[Concepts](docs/concepts/)** - States, tools, planners, policies
+- **[Architecture](docs/architecture/)** - DDD structure, layer responsibilities
+- **[Integration Guides](docs/integrations/)** - LLM providers, packs, security
+- **[Examples](example/)** - Progressive examples from minimal to production
+- **[API Reference](https://pkg.go.dev/github.com/felixgeelhaar/agent-go)** - GoDoc
+
+---
 
 ## Examples
 
-### File Operations
+| Example | Description | Complexity |
+|---------|-------------|------------|
+| [01-minimal](example/01-minimal/) | Absolute minimum working agent | Beginner |
+| [02-tools](example/02-tools/) | Custom tool creation | Beginner |
+| [03-policies](example/03-policies/) | Budgets and approvals | Intermediate |
+| [04-llm-planner](example/04-llm-planner/) | Real LLM integration | Intermediate |
+| [05-observability](example/05-observability/) | Tracing and metrics | Intermediate |
+| [06-distributed](example/06-distributed/) | Multi-worker setup | Advanced |
+| [07-production](example/07-production/) | Full production setup | Advanced |
 
-See `example/fileops/` for a complete example demonstrating:
-- Tool creation with path traversal protection
-- Scripted planner for deterministic execution
-- Full agent lifecycle
+---
+
+## Development
 
 ```bash
-go run ./example/fileops
-```
+# Build
+go build ./...
 
-## Testing
+# Test with race detection
+go test -race ./...
 
-```bash
-# Run all tests
-go test ./...
-
-# Run invariant tests
-go test -v -run TestInvariant ./test/...
+# Coverage
+coverctl check --fail-under=80
 
 # Security scan
 verdict scan
 
-# Coverage
-coverctl check
+# Lint
+golangci-lint run ./...
 ```
 
-## Design Invariants
-
-The runtime enforces these invariants (tested in `test/invariant_test.go` and `test/horizon3_e2e_test.go`):
-
-### Core Runtime Invariants
-
-1. **Tool Eligibility**: Tools execute only in allowed states
-2. **Transition Validity**: Only valid state transitions succeed
-3. **Approval Enforcement**: Destructive tools require approval
-4. **Budget Enforcement**: Execution stops when budget exhausted
-5. **Tool Registration**: Duplicate tools rejected
-6. **Run Lifecycle**: Proper status transitions
-7. **Evidence Accumulation**: Append-only with sequential timestamps
-8. **Ledger Immutability**: Audit trail is append-only
-
-### Horizon 3 Invariants
-
-9. **No Unsupervised Modification**: All policy changes require explicit human approval
-10. **Audit Trail**: Every proposal action recorded with actor, timestamp, reason
-11. **Rollback Capability**: Any applied change can be rolled back
-12. **Suggestion-Only Patterns**: Patterns generate suggestions, never direct changes
-13. **Version Immutability**: Policy versions are append-only
-14. **Human Actor Requirement**: Approve and Apply require non-system actor
+---
 
 ## Dependencies
 
-- [statekit](https://github.com/felixgeelhaar/statekit) - Statechart execution engine
-- [fortify](https://github.com/felixgeelhaar/fortify) - Resilience patterns
-- [bolt](https://github.com/felixgeelhaar/bolt) - Structured logging
+- **[statekit](https://github.com/felixgeelhaar/statekit)** - Statechart execution engine
+- **[fortify](https://github.com/felixgeelhaar/fortify)** - Resilience patterns (circuit breaker, retry)
+- **[bolt](https://github.com/felixgeelhaar/bolt)** - High-performance structured logging
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
 
 ## License
 

@@ -1,0 +1,55 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+
+  settings:
+    errcheck:
+      # Ignore errors from common cleanup/close functions
+      exclude-functions:
+        - (*testing.T).Run
+        - (*testing.B).Run
+        - (*os.File).Close
+        - io.Closer.Close
+        - (io.Closer).Close
+        - (*bytes.Buffer).Reset
+        - (*sql.Rows).Close
+        - (*sql.Tx).Rollback
+        - (*http.Response).Body.Close
+        - (net/http.ResponseWriter).Write
+        - os.RemoveAll
+
+  exclusions:
+    rules:
+      # Exclude errcheck in test files - test setup code commonly ignores errors
+      - path: _test\.go
+        linters:
+          - errcheck
+      # Exclude examples from errcheck - examples prioritize readability
+      - path: example/
+        linters:
+          - errcheck
+      # Allow deprecated functions in cloud providers (GCS uses deprecated options)
+      - path: pack/cloud/
+        linters:
+          - staticcheck
+        text: SA1019
+      # Allow deprecated kubernetes fake client in tests
+      - path: pack/kubernetes/pack_test\.go
+        linters:
+          - staticcheck
+        text: SA1019
+    # Exclude common cleanup patterns
+    paths:
+      - third_party
+      - vendor

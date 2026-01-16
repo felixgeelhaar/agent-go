@@ -53,6 +53,9 @@ type Annotations struct {
 	// Timeout is the maximum execution time in seconds (0 = default).
 	Timeout int `json:"timeout,omitempty"`
 
+	// Sandboxed indicates the tool should execute in an isolated sandbox.
+	Sandboxed bool `json:"sandboxed"`
+
 	// Tags are arbitrary labels for categorization.
 	Tags []string `json:"tags,omitempty"`
 }
