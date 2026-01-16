@@ -1,4 +1,81 @@
-// Package api provides the public API for the agent runtime.
+// Package api provides the public API for the agent-go runtime.
+//
+// agent-go is a state-driven agent framework for Go that enables developers to build
+// trustworthy, adaptable AI-powered systems by designing the structure and constraints
+// of agent behavior rather than scripting intelligence with prompts.
+//
+// # Quick Start
+//
+// Create a minimal agent with a tool and scripted planner:
+//
+//	// 1. Create a tool
+//	echoTool := api.NewToolBuilder("echo").
+//	    WithDescription("Echoes input").
+//	    WithAnnotations(api.Annotations{ReadOnly: true}).
+//	    WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
+//	        return tool.Result{Output: input}, nil
+//	    }).
+//	    MustBuild()
+//
+//	// 2. Create a planner
+//	planner := api.NewScriptedPlanner(
+//	    api.ScriptStep{ExpectState: api.StateIntake, Decision: api.NewTransitionDecision(api.StateExplore, "start")},
+//	    api.ScriptStep{ExpectState: api.StateExplore, Decision: api.NewCallToolDecision("echo", input, "echo")},
+//	    api.ScriptStep{ExpectState: api.StateExplore, Decision: api.NewTransitionDecision(api.StateDecide, "done")},
+//	    api.ScriptStep{ExpectState: api.StateDecide, Decision: api.NewFinishDecision("completed", result)},
+//	)
+//
+//	// 3. Configure tool eligibility
+//	eligibility := api.NewToolEligibility()
+//	eligibility.Allow(api.StateExplore, "echo")
+//
+//	// 4. Create and run the engine
+//	engine, _ := api.New(
+//	    api.WithTool(echoTool),
+//	    api.WithPlanner(planner),
+//	    api.WithToolEligibility(eligibility),
+//	)
+//	run, _ := engine.Run(ctx, "Echo a message")
+//
+// # States
+//
+// The agent operates within a canonical state graph:
+//
+//   - StateIntake: Normalize and understand the goal
+//   - StateExplore: Gather information (read-only tools only)
+//   - StateDecide: Choose next action
+//   - StateAct: Execute side-effects (destructive tools allowed)
+//   - StateValidate: Verify outcomes
+//   - StateDone: Terminal success state
+//   - StateFailed: Terminal failure state
+//
+// # Tools
+//
+// Tools are capabilities the agent can invoke. Each tool has annotations that
+// describe its behavior:
+//
+//   - ReadOnly: Tool does not modify external state
+//   - Destructive: Tool performs irreversible operations
+//   - Idempotent: Repeated calls produce same result
+//   - Cacheable: Results can be cached
+//   - RiskLevel: Potential impact (None, Low, Medium, High, Critical)
+//
+// # Planners
+//
+// Planners make decisions about what the agent should do next:
+//
+//   - ScriptedPlanner: Predefined sequence for testing
+//   - MockPlanner: Returns specific decisions for testing
+//   - LLMPlanner: Uses an LLM provider for intelligent planning
+//
+// # Policies
+//
+// Policies enforce constraints on agent behavior:
+//
+//   - ToolEligibility: Which tools can run in which states
+//   - StateTransitions: Which state transitions are allowed
+//   - Approvers: Human approval for destructive operations
+//   - Budgets: Limits on tool calls, tokens, etc.
 package api
 
 import (
@@ -57,6 +134,17 @@ const (
 	RiskMedium   = tool.RiskMedium
 	RiskHigh     = tool.RiskHigh
 	RiskCritical = tool.RiskCritical
+)
+
+// Re-export run status.
+type RunStatus = agent.RunStatus
+
+const (
+	StatusPending   = agent.RunStatusPending
+	StatusRunning   = agent.RunStatusRunning
+	StatusPaused    = agent.RunStatusPaused
+	StatusCompleted = agent.RunStatusCompleted
+	StatusFailed    = agent.RunStatusFailed
 )
 
 // Engine is the main runtime for agent execution.
@@ -129,6 +217,14 @@ func WithRegistry(r tool.Registry) Option {
 	}
 }
 
+// WithTool registers a tool with the engine's registry.
+// Can be called multiple times to register multiple tools.
+func WithTool(t tool.Tool) Option {
+	return func(c *engineConfig) {
+		c.registry.Register(t)
+	}
+}
+
 // WithPlanner sets the planner.
 func WithPlanner(p planner.Planner) Option {
 	return func(c *engineConfig) {
@@ -178,6 +274,17 @@ func WithBudgets(budgets map[string]int) Option {
 	}
 }
 
+// WithBudget sets a single budget limit.
+// This is a convenience function that can be called multiple times.
+func WithBudget(name string, limit int) Option {
+	return func(c *engineConfig) {
+		if c.budgets == nil {
+			c.budgets = make(map[string]int)
+		}
+		c.budgets[name] = limit
+	}
+}
+
 // WithMaxSteps sets the maximum number of execution steps.
 func WithMaxSteps(n int) Option {
 	return func(c *engineConfig) {
@@ -190,8 +297,11 @@ func WithMaxSteps(n int) Option {
 // - Eligibility middleware (tool access control per state)
 // - Approval middleware (human approval for destructive tools)
 // - Logging middleware (execution timing and results)
-func WithMiddleware(m *middleware.Registry) Option {
+func WithMiddleware(middlewares ...middleware.Middleware) Option {
 	return func(c *engineConfig) {
-		c.middleware = m
+		if c.middleware == nil {
+			c.middleware = middleware.NewRegistry()
+		}
+		c.middleware.UseMany(middlewares...)
 	}
 }

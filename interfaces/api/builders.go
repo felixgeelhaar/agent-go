@@ -1,6 +1,9 @@
 package api
 
 import (
+	"context"
+	"time"
+
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	domaintool "github.com/felixgeelhaar/agent-go/domain/tool"
@@ -76,4 +79,45 @@ func NewFinishDecision(summary string, result []byte) Decision {
 // NewFailDecision creates a decision to terminate with failure.
 func NewFailDecision(reason string, err error) Decision {
 	return agent.NewFailDecision(reason, err)
+}
+
+// AutoApprover returns an approver that automatically approves all requests.
+// This is a convenience function for development and testing.
+func AutoApprover() policy.Approver {
+	return policy.NewAutoApprover("auto")
+}
+
+// DenyApprover returns an approver that automatically denies all requests.
+// This is a convenience function for testing rejection scenarios.
+func DenyApprover(reason string) policy.Approver {
+	return policy.NewDenyApprover(reason)
+}
+
+// ApprovalRequest is re-exported for callback approvers.
+type ApprovalRequest = policy.ApprovalRequest
+
+// ApprovalResponse is re-exported for callback approvers.
+type ApprovalResponse = policy.ApprovalResponse
+
+// CallbackApprover implements the Approver interface using a callback function.
+type CallbackApprover struct {
+	callback func(ctx context.Context, req ApprovalRequest) (bool, error)
+}
+
+// NewCallbackApprover creates an approver that uses a callback function for decisions.
+func NewCallbackApprover(fn func(ctx context.Context, req ApprovalRequest) (bool, error)) *CallbackApprover {
+	return &CallbackApprover{callback: fn}
+}
+
+// Approve processes the approval request using the callback function.
+func (c *CallbackApprover) Approve(ctx context.Context, req ApprovalRequest) (ApprovalResponse, error) {
+	approved, err := c.callback(ctx, req)
+	if err != nil {
+		return ApprovalResponse{}, err
+	}
+	return ApprovalResponse{
+		Approved:  approved,
+		Approver:  "callback",
+		Timestamp: time.Now(),
+	}, nil
 }
