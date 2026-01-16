@@ -84,6 +84,7 @@ import (
 	"github.com/felixgeelhaar/agent-go/application"
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/knowledge"
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
@@ -147,6 +148,54 @@ const (
 	StatusFailed    = agent.RunStatusFailed
 )
 
+// Re-export human input related errors.
+var (
+	// ErrAwaitingHumanInput is returned when the agent pauses for human input.
+	// Check run.PendingQuestion for the question and options.
+	ErrAwaitingHumanInput = agent.ErrAwaitingHumanInput
+
+	// ErrNoPendingQuestion is returned when attempting to resume a run
+	// that has no pending question.
+	ErrNoPendingQuestion = agent.ErrNoPendingQuestion
+
+	// ErrInvalidHumanInput is returned when the provided input doesn't
+	// match the allowed options for the pending question.
+	ErrInvalidHumanInput = agent.ErrInvalidHumanInput
+)
+
+// Re-export knowledge types for RAG capabilities.
+type (
+	// Vector represents an embedding with associated text and metadata.
+	Vector = knowledge.Vector
+
+	// SearchResult represents a similarity search result.
+	SearchResult = knowledge.SearchResult
+
+	// ListFilter provides filtering options for knowledge list operations.
+	ListFilter = knowledge.ListFilter
+
+	// KnowledgeStore is the interface for vector knowledge storage.
+	KnowledgeStore = knowledge.Store
+
+	// KnowledgeStats provides statistics about the knowledge store.
+	KnowledgeStats = knowledge.Stats
+)
+
+// Re-export knowledge errors.
+var (
+	// ErrKnowledgeNotFound indicates the requested vector was not found.
+	ErrKnowledgeNotFound = knowledge.ErrNotFound
+
+	// ErrKnowledgeInvalidID indicates the vector ID is empty or invalid.
+	ErrKnowledgeInvalidID = knowledge.ErrInvalidID
+
+	// ErrKnowledgeInvalidEmbedding indicates the embedding is empty or invalid.
+	ErrKnowledgeInvalidEmbedding = knowledge.ErrInvalidEmbedding
+
+	// ErrKnowledgeDimensionMismatch indicates the embedding dimension doesn't match.
+	ErrKnowledgeDimensionMismatch = knowledge.ErrDimensionMismatch
+)
+
 // Engine is the main runtime for agent execution.
 type Engine struct {
 	engine *application.Engine
@@ -167,6 +216,7 @@ func New(opts ...Option) (*Engine, error) {
 		Planner:      config.planner,
 		Executor:     config.executor,
 		Artifacts:    config.artifacts,
+		Knowledge:    config.knowledge,
 		Eligibility:  config.eligibility,
 		Transitions:  config.transitions,
 		Approver:     config.approver,
@@ -193,12 +243,35 @@ func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]a
 	return e.engine.RunWithVars(ctx, goal, vars)
 }
 
+// ResumeWithInput continues a paused run with human-provided input.
+// This is used after a run returns ErrAwaitingHumanInput to provide the
+// response to the pending question.
+//
+// Example:
+//
+//	run, err := engine.Run(ctx, "Process data and ask for confirmation")
+//	if errors.Is(err, api.ErrAwaitingHumanInput) {
+//	    fmt.Printf("Agent asks: %s\n", run.PendingQuestion.Question)
+//	    input := getUserInput()
+//	    run, err = engine.ResumeWithInput(ctx, run, input)
+//	}
+func (e *Engine) ResumeWithInput(ctx context.Context, run *Run, input string) (*Run, error) {
+	return e.engine.ResumeWithInput(ctx, run, input)
+}
+
+// Knowledge returns the knowledge store, if configured.
+// Returns nil if no knowledge store was provided via WithKnowledgeStore.
+func (e *Engine) Knowledge() knowledge.Store {
+	return e.engine.Knowledge()
+}
+
 // engineConfig holds configuration for engine creation.
 type engineConfig struct {
 	registry    tool.Registry
 	planner     planner.Planner
 	executor    *resilience.Executor
 	artifacts   artifact.Store
+	knowledge   knowledge.Store
 	eligibility *policy.ToolEligibility
 	transitions *policy.StateTransitions
 	approver    policy.Approver
@@ -243,6 +316,15 @@ func WithExecutor(e *resilience.Executor) Option {
 func WithArtifactStore(s artifact.Store) Option {
 	return func(c *engineConfig) {
 		c.artifacts = s
+	}
+}
+
+// WithKnowledgeStore sets the knowledge store for RAG (Retrieval-Augmented Generation).
+// The knowledge store enables agents to store and retrieve knowledge based on semantic
+// similarity using vector embeddings.
+func WithKnowledgeStore(s knowledge.Store) Option {
+	return func(c *engineConfig) {
+		c.knowledge = s
 	}
 }
 

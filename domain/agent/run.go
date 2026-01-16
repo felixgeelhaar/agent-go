@@ -16,19 +16,27 @@ const (
 	RunStatusFailed    RunStatus = "failed"    // Terminated with error
 )
 
+// PendingQuestion represents a question awaiting human input.
+type PendingQuestion struct {
+	Question string    `json:"question"`
+	Options  []string  `json:"options,omitempty"`
+	AskedAt  time.Time `json:"asked_at"`
+}
+
 // Run represents a single execution of the agent.
 // It is the aggregate root for the agent domain.
 type Run struct {
-	ID           string          `json:"id"`
-	Goal         string          `json:"goal"`
-	CurrentState State           `json:"current_state"`
-	Vars         map[string]any  `json:"vars"`
-	Evidence     []Evidence      `json:"evidence"`
-	Status       RunStatus       `json:"status"`
-	StartTime    time.Time       `json:"start_time"`
-	EndTime      time.Time       `json:"end_time,omitempty"`
-	Result       json.RawMessage `json:"result,omitempty"`
-	Error        string          `json:"error,omitempty"`
+	ID              string           `json:"id"`
+	Goal            string           `json:"goal"`
+	CurrentState    State            `json:"current_state"`
+	Vars            map[string]any   `json:"vars"`
+	Evidence        []Evidence       `json:"evidence"`
+	Status          RunStatus        `json:"status"`
+	StartTime       time.Time        `json:"start_time"`
+	EndTime         time.Time        `json:"end_time,omitempty"`
+	Result          json.RawMessage  `json:"result,omitempty"`
+	Error           string           `json:"error,omitempty"`
+	PendingQuestion *PendingQuestion `json:"pending_question,omitempty"`
 }
 
 // NewRun creates a new run with the given ID and initial state.
@@ -118,4 +126,24 @@ func (r *Run) Duration() time.Duration {
 		return time.Since(r.StartTime)
 	}
 	return r.EndTime.Sub(r.StartTime)
+}
+
+// HasPendingQuestion returns true if the run has a pending question awaiting human input.
+func (r *Run) HasPendingQuestion() bool {
+	return r.PendingQuestion != nil
+}
+
+// ClearPendingQuestion removes the pending question from the run.
+func (r *Run) ClearPendingQuestion() {
+	r.PendingQuestion = nil
+}
+
+// AskHuman sets a pending question and pauses the run.
+func (r *Run) AskHuman(question string, options []string) {
+	r.PendingQuestion = &PendingQuestion{
+		Question: question,
+		Options:  options,
+		AskedAt:  time.Now(),
+	}
+	r.Status = RunStatusPaused
 }

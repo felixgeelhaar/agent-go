@@ -21,6 +21,12 @@ func NewToolRegistry() *memory.ToolRegistry {
 	return memory.NewToolRegistry()
 }
 
+// NewKnowledgeStore creates a new in-memory knowledge store for vector embeddings.
+// If dimension is 0, it will be auto-detected from the first vector stored.
+func NewKnowledgeStore(dimension int) *memory.KnowledgeStore {
+	return memory.NewKnowledgeStore(dimension)
+}
+
 // NewMockPlanner creates a mock planner with predefined decisions.
 func NewMockPlanner(decisions ...Decision) *planner.MockPlanner {
 	return planner.NewMockPlanner(decisions...)

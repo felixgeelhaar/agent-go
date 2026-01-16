@@ -18,4 +18,13 @@ var (
 
 	// ErrRunPaused indicates an operation requires an active run.
 	ErrRunPaused = errors.New("run is paused")
+
+	// ErrAwaitingHumanInput indicates the run is paused awaiting human input.
+	ErrAwaitingHumanInput = errors.New("run is awaiting human input")
+
+	// ErrNoPendingQuestion indicates no pending question exists for human input.
+	ErrNoPendingQuestion = errors.New("run does not have a pending question")
+
+	// ErrInvalidHumanInput indicates the human input is not valid for the pending question.
+	ErrInvalidHumanInput = errors.New("invalid human input for pending question")
 )

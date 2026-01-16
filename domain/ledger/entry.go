@@ -22,7 +22,8 @@ const (
 	EntryToolError       EntryType = "tool_error"
 	EntryApprovalRequest EntryType = "approval_request"
 	EntryApprovalResult  EntryType = "approval_result"
-	EntryHumanInput      EntryType = "human_input"
+	EntryHumanInputRequest  EntryType = "human_input_request"
+	EntryHumanInputResponse EntryType = "human_input_response"
 	EntryBudgetConsumed  EntryType = "budget_consumed"
 	EntryBudgetExhausted EntryType = "budget_exhausted"
 )
@@ -93,6 +94,18 @@ type BudgetDetails struct {
 	BudgetName string `json:"budget_name"`
 	Amount     int    `json:"amount"`
 	Remaining  int    `json:"remaining"`
+}
+
+// HumanInputRequestDetails contains details for human input request entries.
+type HumanInputRequestDetails struct {
+	Question string   `json:"question"`
+	Options  []string `json:"options,omitempty"`
+}
+
+// HumanInputResponseDetails contains details for human input response entries.
+type HumanInputResponseDetails struct {
+	Question string `json:"question"`
+	Response string `json:"response"`
 }
 
 // NewEntry creates a new ledger entry.

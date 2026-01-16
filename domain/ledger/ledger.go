@@ -201,3 +201,19 @@ func (l *Ledger) RecordBudgetExhausted(state agent.State, budgetName string) {
 		Remaining:  0,
 	}))
 }
+
+// RecordHumanInputRequest records a request for human input.
+func (l *Ledger) RecordHumanInputRequest(state agent.State, question string, options []string) {
+	l.Append(NewEntry(EntryHumanInputRequest, l.runID, state, HumanInputRequestDetails{
+		Question: question,
+		Options:  options,
+	}))
+}
+
+// RecordHumanInputResponse records a human input response.
+func (l *Ledger) RecordHumanInputResponse(state agent.State, question, response string) {
+	l.Append(NewEntry(EntryHumanInputResponse, l.runID, state, HumanInputResponseDetails{
+		Question: question,
+		Response: response,
+	}))
+}

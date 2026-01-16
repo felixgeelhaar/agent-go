@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/felixgeelhaar/statekit"
 
@@ -115,4 +116,26 @@ func (i *Interpreter) ConfigureEligibility(eligibility *policy.ToolEligibility) 
 // Matches checks if the current state matches the given state ID.
 func (i *Interpreter) Matches(stateID string) bool {
 	return i.interp.Matches(statekit.StateID(stateID))
+}
+
+// ResumeFrom restores the interpreter to a specific state.
+// This is used when resuming a paused run.
+func (i *Interpreter) ResumeFrom(state agent.State) error {
+	// Create a snapshot with the desired state
+	snapshot := statekit.Snapshot[*Context]{
+		MachineID:    "agent",
+		CurrentState: statekit.StateID(string(state)),
+		Context:      i.ctx,
+		CreatedAt:    time.Now(),
+	}
+
+	// Restore the interpreter to this state
+	if err := i.interp.Restore(snapshot); err != nil {
+		return fmt.Errorf("failed to restore state: %w", err)
+	}
+
+	// Sync run state
+	i.ctx.Run.CurrentState = state
+
+	return nil
 }

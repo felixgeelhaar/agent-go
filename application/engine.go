@@ -3,12 +3,14 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/knowledge"
 	"github.com/felixgeelhaar/agent-go/domain/ledger"
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
@@ -22,16 +24,17 @@ import (
 
 // Engine is the main orchestration service for agent execution.
 type Engine struct {
-	registry    tool.Registry
-	planner     planner.Planner
-	executor    *resilience.Executor
-	artifacts   artifact.Store
-	eligibility *policy.ToolEligibility
-	transitions *policy.StateTransitions
-	approver    policy.Approver
+	registry     tool.Registry
+	planner      planner.Planner
+	executor     *resilience.Executor
+	artifacts    artifact.Store
+	knowledge    knowledge.Store
+	eligibility  *policy.ToolEligibility
+	transitions  *policy.StateTransitions
+	approver     policy.Approver
 	budgetLimits map[string]int
-	maxSteps    int
-	middleware  *middleware.Registry
+	maxSteps     int
+	middleware   *middleware.Registry
 }
 
 // EngineConfig contains configuration for the engine.
@@ -40,6 +43,7 @@ type EngineConfig struct {
 	Planner      planner.Planner
 	Executor     *resilience.Executor
 	Artifacts    artifact.Store
+	Knowledge    knowledge.Store
 	Eligibility  *policy.ToolEligibility
 	Transitions  *policy.StateTransitions
 	Approver     policy.Approver
@@ -62,6 +66,7 @@ func NewEngine(config EngineConfig) (*Engine, error) {
 		planner:      config.Planner,
 		executor:     config.Executor,
 		artifacts:    config.Artifacts,
+		knowledge:    config.Knowledge,
 		eligibility:  config.Eligibility,
 		transitions:  config.Transitions,
 		approver:     config.Approver,
@@ -172,6 +177,15 @@ func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]a
 		}
 
 		if err := e.step(ctx, interp, machineCtx); err != nil {
+			// Handle human input request specially - not a failure
+			if errors.Is(err, agent.ErrAwaitingHumanInput) {
+				logging.Info().
+					Add(logging.RunID(runID)).
+					Add(logging.State(run.CurrentState)).
+					Msg("run paused for human input")
+				return run, err
+			}
+
 			run.Fail(err.Error())
 			runLedger.RecordRunFailed(run.CurrentState, err.Error())
 
@@ -198,6 +212,134 @@ func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]a
 		Add(logging.State(run.CurrentState)).
 		Add(logging.Duration(run.Duration())).
 		Msg("run completed")
+
+	if run.Status == agent.RunStatusCompleted {
+		runLedger.RecordRunCompleted(run.Result)
+	}
+
+	return run, nil
+}
+
+// ResumeWithInput continues a paused run with human-provided input.
+func (e *Engine) ResumeWithInput(ctx context.Context, run *agent.Run, input string) (*agent.Run, error) {
+	// Validate run exists
+	if run == nil {
+		return nil, errors.New("run is nil")
+	}
+
+	// Validate run has pending question
+	if !run.HasPendingQuestion() {
+		return nil, agent.ErrNoPendingQuestion
+	}
+
+	// Validate input against options if constrained
+	if len(run.PendingQuestion.Options) > 0 {
+		valid := false
+		for _, opt := range run.PendingQuestion.Options {
+			if opt == input {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, fmt.Errorf("%w: must be one of %v", agent.ErrInvalidHumanInput, run.PendingQuestion.Options)
+		}
+	}
+
+	// Save question before clearing
+	question := run.PendingQuestion.Question
+
+	// Add human input as evidence
+	evidenceContent, _ := json.Marshal(map[string]string{
+		"question": question,
+		"response": input,
+	})
+	run.AddEvidence(agent.NewHumanEvidence(evidenceContent))
+
+	// Clear pending question and resume
+	run.ClearPendingQuestion()
+	run.Resume()
+
+	// Create supporting components (fresh for this segment)
+	budget := policy.NewBudget(e.budgetLimits)
+	runLedger := ledger.New(run.ID)
+
+	// Record human input response in ledger
+	runLedger.RecordHumanInputResponse(run.CurrentState, question, input)
+
+	// Create state machine context
+	machineCtx := statemachine.NewContext(run, budget, runLedger)
+	machineCtx.Eligibility = e.eligibility
+	machineCtx.Transitions = e.transitions
+
+	// Create state machine
+	machine, err := statemachine.NewAgentMachine()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state machine: %w", err)
+	}
+
+	// Create interpreter and resume from current state
+	interp := statemachine.NewInterpreter(machine, machineCtx)
+
+	// Resume state machine from current state
+	if err := interp.ResumeFrom(run.CurrentState); err != nil {
+		return nil, fmt.Errorf("failed to resume state machine: %w", err)
+	}
+
+	// Log resumption
+	logging.Info().
+		Add(logging.RunID(run.ID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.Str("human_input", input)).
+		Msg("run resumed with human input")
+
+	// Execute until terminal state or max steps
+	steps := 0
+	for !interp.IsTerminal() && steps < e.maxSteps {
+		select {
+		case <-ctx.Done():
+			run.Fail("context cancelled")
+			runLedger.RecordRunFailed(run.CurrentState, "context cancelled")
+			return run, ctx.Err()
+		default:
+		}
+
+		if err := e.step(ctx, interp, machineCtx); err != nil {
+			// Handle human input request specially - not a failure
+			if errors.Is(err, agent.ErrAwaitingHumanInput) {
+				logging.Info().
+					Add(logging.RunID(run.ID)).
+					Add(logging.State(run.CurrentState)).
+					Msg("run paused for human input")
+				return run, err
+			}
+
+			run.Fail(err.Error())
+			runLedger.RecordRunFailed(run.CurrentState, err.Error())
+
+			logging.Error().
+				Add(logging.RunID(run.ID)).
+				Add(logging.State(run.CurrentState)).
+				Add(logging.ErrorField(err)).
+				Msg("run failed")
+
+			return run, err
+		}
+		steps++
+	}
+
+	if steps >= e.maxSteps && !interp.IsTerminal() {
+		run.Fail("max steps exceeded")
+		runLedger.RecordRunFailed(run.CurrentState, "max steps exceeded")
+		return run, errors.New("max steps exceeded")
+	}
+
+	// Log completion
+	logging.Info().
+		Add(logging.RunID(run.ID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.Duration(run.Duration())).
+		Msg("run completed after resume")
 
 	if run.Status == agent.RunStatusCompleted {
 		runLedger.RecordRunCompleted(run.Result)
@@ -318,10 +460,25 @@ func (e *Engine) executeTransition(_ context.Context, interp *statemachine.Inter
 	return interp.Transition(decision.ToState, decision.Reason)
 }
 
-// executeAskHuman handles human input requests.
-func (e *Engine) executeAskHuman(_ context.Context, _ *statemachine.Interpreter, _ *statemachine.Context, _ *agent.AskHumanDecision) error {
-	// For now, human input is not implemented
-	return errors.New("human input not implemented")
+// executeAskHuman handles human input requests by pausing the run.
+func (e *Engine) executeAskHuman(_ context.Context, _ *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.AskHumanDecision) error {
+	run := machineCtx.Run
+	runLedger := machineCtx.Ledger
+
+	// Set the pending question on the run
+	run.AskHuman(decision.Question, decision.Options)
+
+	// Record in ledger
+	runLedger.RecordHumanInputRequest(run.CurrentState, decision.Question, decision.Options)
+
+	logging.Info().
+		Add(logging.RunID(run.ID)).
+		Add(logging.State(run.CurrentState)).
+		Add(logging.Str("question", decision.Question)).
+		Msg("awaiting human input")
+
+	// Return special error to signal the run should pause
+	return agent.ErrAwaitingHumanInput
 }
 
 // executeFinish completes the run successfully.
@@ -351,4 +508,9 @@ func (e *Engine) executeFail(_ context.Context, interp *statemachine.Interpreter
 // generateRunID creates a unique run ID.
 func generateRunID() string {
 	return fmt.Sprintf("run-%d", time.Now().UnixNano())
+}
+
+// Knowledge returns the knowledge store, if configured.
+func (e *Engine) Knowledge() knowledge.Store {
+	return e.knowledge
 }

@@ -546,7 +546,7 @@ func TestRun_InvalidTransition_Rejected(t *testing.T) {
 
 // Human Input Tests
 
-func TestRun_AskHuman_NotImplemented(t *testing.T) {
+func TestRun_AskHuman_PausesExecution(t *testing.T) {
 	registry := newTestRegistry()
 
 	scriptedPlanner := planner.NewScriptedPlanner(
@@ -556,6 +556,7 @@ func TestRun_AskHuman_NotImplemented(t *testing.T) {
 				Type: agent.DecisionAskHuman,
 				AskHuman: &agent.AskHumanDecision{
 					Question: "What should I do?",
+					Options:  []string{"Option A", "Option B"},
 				},
 			},
 		},
@@ -572,11 +573,247 @@ func TestRun_AskHuman_NotImplemented(t *testing.T) {
 	ctx := context.Background()
 	run, runErr := engine.Run(ctx, "test human input")
 
-	if runErr == nil || runErr.Error() != "human input not implemented" {
-		t.Errorf("expected 'human input not implemented' error, got %v", runErr)
+	// Should return ErrAwaitingHumanInput
+	if !errors.Is(runErr, agent.ErrAwaitingHumanInput) {
+		t.Errorf("expected ErrAwaitingHumanInput error, got %v", runErr)
 	}
-	if run.Status != agent.RunStatusFailed {
-		t.Errorf("expected run to fail, got status %s", run.Status)
+
+	// Run should be paused, not failed
+	if run.Status != agent.RunStatusPaused {
+		t.Errorf("expected run status paused, got %s", run.Status)
+	}
+
+	// Should have pending question
+	if !run.HasPendingQuestion() {
+		t.Error("expected run to have pending question")
+	}
+
+	if run.PendingQuestion.Question != "What should I do?" {
+		t.Errorf("expected question 'What should I do?', got %s", run.PendingQuestion.Question)
+	}
+
+	if len(run.PendingQuestion.Options) != 2 {
+		t.Errorf("expected 2 options, got %d", len(run.PendingQuestion.Options))
+	}
+}
+
+func TestResumeWithInput_AddsEvidenceAndContinues(t *testing.T) {
+	registry := newTestRegistry()
+
+	// First step: ask human, then follow valid transition path to done
+	scriptedPlanner := planner.NewScriptedPlanner(
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision: agent.Decision{
+				Type: agent.DecisionAskHuman,
+				AskHuman: &agent.AskHumanDecision{
+					Question: "Which option?",
+					Options:  []string{"A", "B"},
+				},
+			},
+		},
+		// After resume, continue with valid path: intake -> explore -> decide -> done
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision:    agent.NewTransitionDecision(agent.StateExplore, "exploring after human input"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision:    agent.NewTransitionDecision(agent.StateDecide, "ready to decide"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateDecide,
+			Decision:    agent.NewFinishDecision("completed with input", json.RawMessage(`{"result":"done"}`)),
+		},
+	)
+
+	engine, err := NewEngine(EngineConfig{
+		Registry: registry,
+		Planner:  scriptedPlanner,
+	})
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// First run pauses for human input
+	run, err := engine.Run(ctx, "test resume")
+	if !errors.Is(err, agent.ErrAwaitingHumanInput) {
+		t.Fatalf("expected ErrAwaitingHumanInput, got %v", err)
+	}
+
+	// Resume with valid input
+	run, err = engine.ResumeWithInput(ctx, run, "A")
+	if err != nil {
+		t.Fatalf("ResumeWithInput failed: %v", err)
+	}
+
+	// Run should complete
+	if run.Status != agent.RunStatusCompleted {
+		t.Errorf("expected completed status, got %s", run.Status)
+	}
+
+	// Should have human input in evidence
+	hasHumanEvidence := false
+	for _, e := range run.Evidence {
+		if e.Type == agent.EvidenceHumanInput {
+			hasHumanEvidence = true
+			// Verify content includes question and response
+			var content map[string]string
+			if err := json.Unmarshal(e.Content, &content); err != nil {
+				t.Errorf("failed to unmarshal evidence content: %v", err)
+			}
+			if content["question"] != "Which option?" {
+				t.Errorf("expected question in evidence, got %v", content)
+			}
+			if content["response"] != "A" {
+				t.Errorf("expected response 'A' in evidence, got %v", content)
+			}
+		}
+	}
+	if !hasHumanEvidence {
+		t.Error("expected human input evidence to be added")
+	}
+
+	// Pending question should be cleared
+	if run.HasPendingQuestion() {
+		t.Error("pending question should be cleared after resume")
+	}
+}
+
+func TestResumeWithInput_ValidatesOptions(t *testing.T) {
+	registry := newTestRegistry()
+
+	scriptedPlanner := planner.NewScriptedPlanner(
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision: agent.Decision{
+				Type: agent.DecisionAskHuman,
+				AskHuman: &agent.AskHumanDecision{
+					Question: "Choose one",
+					Options:  []string{"yes", "no"},
+				},
+			},
+		},
+	)
+
+	engine, err := NewEngine(EngineConfig{
+		Registry: registry,
+		Planner:  scriptedPlanner,
+	})
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	ctx := context.Background()
+
+	run, err := engine.Run(ctx, "test validation")
+	if !errors.Is(err, agent.ErrAwaitingHumanInput) {
+		t.Fatalf("expected ErrAwaitingHumanInput, got %v", err)
+	}
+
+	// Try invalid input
+	_, err = engine.ResumeWithInput(ctx, run, "maybe")
+	if !errors.Is(err, agent.ErrInvalidHumanInput) {
+		t.Errorf("expected ErrInvalidHumanInput for invalid option, got %v", err)
+	}
+}
+
+func TestResumeWithInput_RequiresPendingQuestion(t *testing.T) {
+	registry := newTestRegistry()
+
+	// Valid path: intake -> explore -> decide -> done
+	scriptedPlanner := planner.NewScriptedPlanner(
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision:    agent.NewTransitionDecision(agent.StateExplore, "explore"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision:    agent.NewTransitionDecision(agent.StateDecide, "decide"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateDecide,
+			Decision:    agent.NewFinishDecision("done", json.RawMessage(`{}`)),
+		},
+	)
+
+	engine, err := NewEngine(EngineConfig{
+		Registry: registry,
+		Planner:  scriptedPlanner,
+	})
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	ctx := context.Background()
+
+	run, err := engine.Run(ctx, "test no pending question")
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	// Try to resume a run that has no pending question
+	_, err = engine.ResumeWithInput(ctx, run, "some input")
+	if !errors.Is(err, agent.ErrNoPendingQuestion) {
+		t.Errorf("expected ErrNoPendingQuestion, got %v", err)
+	}
+}
+
+func TestResumeWithInput_AllowsFreeformInput(t *testing.T) {
+	registry := newTestRegistry()
+
+	// No options = freeform input allowed
+	scriptedPlanner := planner.NewScriptedPlanner(
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision: agent.Decision{
+				Type: agent.DecisionAskHuman,
+				AskHuman: &agent.AskHumanDecision{
+					Question: "What is your name?",
+					Options:  nil, // No options = freeform
+				},
+			},
+		},
+		// After resume, follow valid path: intake -> explore -> decide -> done
+		planner.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision:    agent.NewTransitionDecision(agent.StateExplore, "explore"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision:    agent.NewTransitionDecision(agent.StateDecide, "decide"),
+		},
+		planner.ScriptStep{
+			ExpectState: agent.StateDecide,
+			Decision:    agent.NewFinishDecision("got name", json.RawMessage(`{}`)),
+		},
+	)
+
+	engine, err := NewEngine(EngineConfig{
+		Registry: registry,
+		Planner:  scriptedPlanner,
+	})
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	ctx := context.Background()
+
+	run, err := engine.Run(ctx, "test freeform")
+	if !errors.Is(err, agent.ErrAwaitingHumanInput) {
+		t.Fatalf("expected ErrAwaitingHumanInput, got %v", err)
+	}
+
+	// Any input should be accepted when no options specified
+	run, err = engine.ResumeWithInput(ctx, run, "Claude")
+	if err != nil {
+		t.Fatalf("ResumeWithInput failed: %v", err)
+	}
+
+	if run.Status != agent.RunStatusCompleted {
+		t.Errorf("expected completed status, got %s", run.Status)
 	}
 }
 
