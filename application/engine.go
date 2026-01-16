@@ -303,7 +303,7 @@ func (e *Engine) executeToolDecision(ctx context.Context, _ *statemachine.Interp
 	}
 
 	// Consume budget on success
-	budget.Consume("tool_calls", 1) // #nosec G104 -- validated by CanConsume check above
+	_ = budget.Consume("tool_calls", 1) // validated by CanConsume check above
 	runLedger.RecordBudgetConsumed(run.CurrentState, "tool_calls", 1, budget.Remaining("tool_calls"))
 	runLedger.RecordToolResult(run.CurrentState, decision.ToolName, result.Output, result.Duration, result.Cached)
 
