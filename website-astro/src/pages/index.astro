@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import StateMachine from '../components/StateMachine.vue';
 import CodeTabs from '../components/CodeTabs.vue';
+import AgentDemo from '../components/AgentDemo.vue';
 const base = import.meta.env.BASE_URL;
 ---
 
@@ -162,6 +163,59 @@ const base = import.meta.env.BASE_URL;
                     <h2>Quickstart</h2>
                 </div>
                 <CodeTabs client:load />
+            </div>
+        </section>
+
+        <!-- Agent Demo Section -->
+        <section class="agent-showcase" id="demo">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// SEE IT IN ACTION</span>
+                    <h2>File Operations Agent</h2>
+                    <p class="section-lead">
+                        A simple agent that manages files in a workspace.
+                        Watch it explore, decide, and act through the state machine.
+                    </p>
+                </div>
+                <div class="showcase-grid">
+                    <div class="showcase-tools">
+                        <h3>Available Tools</h3>
+                        <div class="tool-list">
+                            <div class="tool-card">
+                                <div class="tool-header">
+                                    <code>list_dir</code>
+                                    <span class="tool-badge readonly">ReadOnly</span>
+                                </div>
+                                <p>List files and directories in a path</p>
+                            </div>
+                            <div class="tool-card">
+                                <div class="tool-header">
+                                    <code>read_file</code>
+                                    <span class="tool-badge readonly">ReadOnly</span>
+                                </div>
+                                <p>Read contents of a file</p>
+                            </div>
+                            <div class="tool-card">
+                                <div class="tool-header">
+                                    <code>write_file</code>
+                                    <span class="tool-badge idempotent">Idempotent</span>
+                                </div>
+                                <p>Write content to a file</p>
+                            </div>
+                            <div class="tool-card">
+                                <div class="tool-header">
+                                    <code>delete_file</code>
+                                    <span class="tool-badge destructive">Destructive</span>
+                                </div>
+                                <p>Delete a file (requires approval)</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="showcase-demo">
+                        <h3>Execution Trace</h3>
+                        <AgentDemo client:load />
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -548,6 +602,100 @@ const base = import.meta.env.BASE_URL;
     margin-right: var(--space-sm);
 }
 
+/* Agent Showcase Section */
+.agent-showcase {
+    padding: var(--space-4xl) 0;
+}
+
+.section-lead {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin-top: var(--space-md);
+}
+
+.showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: var(--space-xl);
+    margin-top: var(--space-xl);
+}
+
+.showcase-tools h3,
+.showcase-demo h3 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-md);
+}
+
+.tool-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.tool-card {
+    padding: var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    transition: border-color var(--transition-fast);
+}
+
+.tool-card:hover {
+    border-color: var(--border-secondary);
+}
+
+.tool-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-xs);
+}
+
+.tool-header code {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.tool-badge {
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tool-badge.readonly {
+    background: rgba(63, 185, 80, 0.2);
+    color: #3fb950;
+}
+
+.tool-badge.idempotent {
+    background: rgba(0, 217, 255, 0.2);
+    color: #00d9ff;
+}
+
+.tool-badge.destructive {
+    background: rgba(248, 81, 73, 0.2);
+    color: #f85149;
+}
+
+.tool-card p {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+
 /* CTA Section */
 .cta {
     padding: var(--space-4xl) 0;
@@ -595,6 +743,24 @@ const base = import.meta.env.BASE_URL;
     .arch-grid {
         grid-template-columns: 1fr;
     }
+
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .showcase-tools {
+        order: 1;
+    }
+
+    .showcase-demo {
+        order: 0;
+    }
+
+    .tool-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-sm);
+    }
 }
 
 @media (max-width: 768px) {
@@ -605,6 +771,10 @@ const base = import.meta.env.BASE_URL;
     .cta-actions {
         flex-direction: column;
         align-items: center;
+    }
+
+    .tool-list {
+        grid-template-columns: 1fr;
     }
 }
 </style>
