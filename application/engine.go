@@ -3,6 +3,8 @@ package application
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -505,9 +507,11 @@ func (e *Engine) executeFail(_ context.Context, interp *statemachine.Interpreter
 	return nil
 }
 
-// generateRunID creates a unique run ID.
+// generateRunID creates a unique run ID using timestamp and random bytes.
 func generateRunID() string {
-	return fmt.Sprintf("run-%d", time.Now().UnixNano())
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("run-%d-%s", time.Now().UnixNano(), hex.EncodeToString(b))
 }
 
 // Knowledge returns the knowledge store, if configured.

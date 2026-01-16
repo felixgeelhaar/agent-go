@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/felixgeelhaar/agent-go/domain/agent"
@@ -107,7 +108,7 @@ type UnexpectedStateError struct {
 }
 
 func (e *UnexpectedStateError) Error() string {
-	return "unexpected state at step " + string(rune(e.StepIndex)) + ": expected " + string(e.Expected) + ", got " + string(e.Actual)
+	return fmt.Sprintf("unexpected state at step %d: expected %s, got %s", e.StepIndex, e.Expected, e.Actual)
 }
 
 // ConditionFailedError indicates a step condition was not met.
@@ -117,5 +118,5 @@ type ConditionFailedError struct {
 }
 
 func (e *ConditionFailedError) Error() string {
-	return "condition failed at step " + string(rune(e.StepIndex)) + " in state " + string(e.State)
+	return fmt.Sprintf("condition failed at step %d in state %s", e.StepIndex, e.State)
 }
