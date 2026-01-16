@@ -190,7 +190,7 @@ func (p *BedrockProvider) Complete(ctx context.Context, req CompletionRequest) (
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("bedrock error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("bedrock", resp.StatusCode, respBody)
 	}
 
 	var bedrockResp bedrockClaudeResponse

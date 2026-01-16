@@ -102,6 +102,9 @@ func NewEngine(config EngineConfig) (*Engine, error) {
 func (e *Engine) defaultMiddlewareChain() *middleware.Registry {
 	registry := middleware.NewRegistry()
 
+	// Input validation (security: validate inputs before any processing)
+	registry.Use(inframw.Validation(inframw.DefaultValidationConfig()))
+
 	// Eligibility check (tool allowed in current state)
 	registry.Use(inframw.Eligibility(inframw.EligibilityConfig{
 		Eligibility: e.eligibility,

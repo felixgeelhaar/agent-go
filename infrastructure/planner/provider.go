@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // Provider defines the interface for LLM providers.
@@ -97,4 +98,67 @@ type ProviderConfig struct {
 	Temperature float64
 	MaxTokens   int
 	Timeout     int // seconds
+}
+
+// sanitizeProviderError creates an error message without exposing sensitive API details.
+// It extracts only the HTTP status code and a generic error indicator, avoiding
+// the full response body which may contain API keys, internal error codes, or
+// sensitive debugging information.
+func sanitizeProviderError(provider string, statusCode int, respBody []byte) error {
+	// Try to extract a safe error message from common JSON error structures
+	var errResp struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+		} `json:"error"`
+		Message string `json:"message"` // Alternative format
+	}
+
+	if err := json.Unmarshal(respBody, &errResp); err == nil {
+		// Use structured error message if available
+		msg := errResp.Error.Message
+		if msg == "" {
+			msg = errResp.Message
+		}
+		if msg != "" {
+			// Truncate long messages to prevent sensitive data leakage
+			if len(msg) > 200 {
+				msg = msg[:200] + "..."
+			}
+			return &APIError{
+				Type:    errResp.Error.Type,
+				Message: msg,
+			}
+		}
+	}
+
+	// Fallback to generic error without exposing response body
+	return &APIError{
+		Type:    "provider_error",
+		Message: provider + " request failed with status " + httpStatusText(statusCode),
+	}
+}
+
+// httpStatusText returns a human-readable status text for common HTTP codes.
+func httpStatusText(code int) string {
+	switch code {
+	case 400:
+		return "400 Bad Request"
+	case 401:
+		return "401 Unauthorized"
+	case 403:
+		return "403 Forbidden"
+	case 404:
+		return "404 Not Found"
+	case 429:
+		return "429 Too Many Requests"
+	case 500:
+		return "500 Internal Server Error"
+	case 502:
+		return "502 Bad Gateway"
+	case 503:
+		return "503 Service Unavailable"
+	default:
+		return fmt.Sprintf("HTTP %d", code)
+	}
 }

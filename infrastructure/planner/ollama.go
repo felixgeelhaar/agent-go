@@ -126,7 +126,7 @@ func (p *OllamaProvider) Complete(ctx context.Context, req CompletionRequest) (C
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("ollama error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("ollama", resp.StatusCode, respBody)
 	}
 
 	var ollamaResp ollamaChatResponse

@@ -162,7 +162,7 @@ func (p *CohereProvider) Complete(ctx context.Context, req CompletionRequest) (C
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("cohere error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("cohere", resp.StatusCode, respBody)
 	}
 
 	var cohereResp cohereChatResponse

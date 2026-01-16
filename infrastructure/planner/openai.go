@@ -141,7 +141,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req CompletionRequest) (C
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("openai error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("openai", resp.StatusCode, respBody)
 	}
 
 	var openAIResp openAIChatResponse

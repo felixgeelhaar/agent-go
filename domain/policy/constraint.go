@@ -5,6 +5,11 @@ import (
 )
 
 // ToolEligibility defines which tools are allowed in which states.
+//
+// Thread Safety: ToolEligibility is NOT safe for concurrent modification.
+// It should be fully configured before being passed to the engine and
+// treated as immutable thereafter. The read methods (IsAllowed, AllowedTools)
+// are safe for concurrent use after configuration is complete.
 type ToolEligibility struct {
 	allowed map[agent.State]map[string]bool
 }
@@ -57,6 +62,11 @@ func (e *ToolEligibility) AllowedTools(state agent.State) []string {
 }
 
 // StateTransitions defines allowed state transitions.
+//
+// Thread Safety: StateTransitions is NOT safe for concurrent modification.
+// It should be fully configured before being passed to the engine and
+// treated as immutable thereafter. The read methods (CanTransition,
+// AllowedTransitions) are safe for concurrent use after configuration is complete.
 type StateTransitions struct {
 	transitions map[agent.State][]agent.State
 }

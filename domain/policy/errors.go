@@ -3,15 +3,14 @@ package policy
 import "errors"
 
 // Domain errors for policy enforcement.
+//
+// Note: For approval-related errors (required, denied), use the canonical
+// errors from the tool package (tool.ErrApprovalRequired, tool.ErrApprovalDenied).
+// This avoids duplication and maintains clear ownership since approvals are
+// fundamentally about tool execution authorization.
 var (
 	// ErrBudgetExceeded indicates the budget limit has been exceeded.
 	ErrBudgetExceeded = errors.New("budget exceeded")
-
-	// ErrApprovalRequired indicates approval is required but not obtained.
-	ErrApprovalRequired = errors.New("approval required")
-
-	// ErrApprovalDenied indicates the approval request was denied.
-	ErrApprovalDenied = errors.New("approval denied")
 
 	// ErrApprovalTimeout indicates the approval request timed out.
 	ErrApprovalTimeout = errors.New("approval request timed out")

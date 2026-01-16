@@ -169,7 +169,7 @@ func (p *GeminiProvider) Complete(ctx context.Context, req CompletionRequest) (C
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("gemini error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("gemini", resp.StatusCode, respBody)
 	}
 
 	var geminiResp geminiResponse

@@ -152,7 +152,7 @@ func (p *AnthropicProvider) Complete(ctx context.Context, req CompletionRequest)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return CompletionResponse{}, fmt.Errorf("anthropic error (status %d): %s", resp.StatusCode, string(respBody))
+		return CompletionResponse{}, sanitizeProviderError("anthropic", resp.StatusCode, respBody)
 	}
 
 	var anthropicResp anthropicResponse

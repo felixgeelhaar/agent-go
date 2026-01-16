@@ -219,6 +219,9 @@ func (p *LLMPlanner) parseResponse(content string) (agent.Decision, error) {
 
 	switch resp.Decision {
 	case "call_tool":
+		if resp.ToolName == "" {
+			return agent.Decision{}, fmt.Errorf("call_tool decision missing tool_name")
+		}
 		return agent.Decision{
 			Type: agent.DecisionCallTool,
 			CallTool: &agent.CallToolDecision{
@@ -229,6 +232,9 @@ func (p *LLMPlanner) parseResponse(content string) (agent.Decision, error) {
 		}, nil
 
 	case "transition":
+		if resp.ToState == "" {
+			return agent.Decision{}, fmt.Errorf("transition decision missing to_state")
+		}
 		return agent.Decision{
 			Type: agent.DecisionTransition,
 			Transition: &agent.TransitionDecision{
