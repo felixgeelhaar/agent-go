@@ -14,8 +14,25 @@ permissions:
   security-events: write
 
 jobs:
-  verdict:
-    name: Verdict Security Scan
+  gosec:
+    name: Gosec SAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out gosec-results.sarif ./...'
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec-results.sarif
+
+  govulncheck:
+    name: Govulncheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,32 +44,16 @@ jobs:
           go-version: '1.23'
           cache: true
 
-      - name: Install Verdict and Engines
+      - name: Run govulncheck
         run: |
-          # Install verdict
-          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
-
-          # Install security engines (continue on individual failures)
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.21.4 || true
-          go install golang.org/x/vuln/cmd/govulncheck@latest || true
-          go install honnef.co/go/tools/cmd/staticcheck@latest || true
-
-          # gitleaks uses different module path - install from correct source
-          go install github.com/zricethezav/gitleaks/v8@latest || true
-
-      - name: Run Verdict Security Scan
-        run: |
-          verdict scan --sarif --output verdict-results.sarif . || true
-          # Ensure SARIF file exists even if scan fails
-          if [ ! -f verdict-results.sarif ]; then
-            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > verdict-results.sarif
-          fi
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck -format sarif ./... > govulncheck-results.sarif || true
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: verdict-results.sarif
+          sarif_file: govulncheck-results.sarif
 
   dependency-review:
     name: Dependency Review
