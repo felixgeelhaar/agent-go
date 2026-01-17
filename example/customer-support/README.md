@@ -148,8 +148,13 @@ To extend this example:
 3. **Add LLM planner**: Replace scripted planner with actual LLM for dynamic decisions
 4. **Implement human-in-the-loop**: Real approval flow for escalations
 
-## Related
+## Related Examples
 
-- [FileOps Example](../fileops/) - File operations with path security
-- [DevOps Monitor Example](../devops-monitor/) - Infrastructure monitoring agent
-- [Website Demo](https://felixgeelhaar.github.io/agent-go/) - Interactive visualization
+- [FileOps Agent](../fileops/) - File operations with path security
+- [DevOps Monitor Agent](../devops-monitor/) - Infrastructure monitoring with incident response
+
+## See Also
+
+- [Website Demo](https://felixgeelhaar.github.io/agent-go/#demo) - Interactive visualization of this agent
+- [Documentation](https://felixgeelhaar.github.io/agent-go/docs/) - Full API documentation
+- [GitHub Repository](https://github.com/felixgeelhaar/agent-go) - Source code and issues

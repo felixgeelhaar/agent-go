@@ -147,3 +147,14 @@ To add more tools:
 3. Set appropriate annotations
 4. Register with the registry
 5. Configure eligibility for each state
+
+## Related Examples
+
+- [Customer Support Agent](../customer-support/) - Support ticket handling with KB search
+- [DevOps Monitor Agent](../devops-monitor/) - Infrastructure monitoring with incident response
+
+## See Also
+
+- [Website Demo](https://felixgeelhaar.github.io/agent-go/#demo) - Interactive visualization of this agent
+- [Documentation](https://felixgeelhaar.github.io/agent-go/docs/) - Full API documentation
+- [GitHub Repository](https://github.com/felixgeelhaar/agent-go) - Source code and issues

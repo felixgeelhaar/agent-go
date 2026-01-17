@@ -168,8 +168,13 @@ To extend this example:
 - **Rollback capability**: Auto-rollback if restart doesn't help
 - **Audit logging**: Track all actions with evidence
 
-## Related
+## Related Examples
 
-- [FileOps Example](../fileops/) - File operations with path security
-- [Customer Support Example](../customer-support/) - Support ticket handling
-- [Website Demo](https://felixgeelhaar.github.io/agent-go/) - Interactive visualization
+- [FileOps Agent](../fileops/) - File operations with path security
+- [Customer Support Agent](../customer-support/) - Support ticket handling with KB search
+
+## See Also
+
+- [Website Demo](https://felixgeelhaar.github.io/agent-go/#demo) - Interactive visualization of this agent
+- [Documentation](https://felixgeelhaar.github.io/agent-go/docs/) - Full API documentation
+- [GitHub Repository](https://github.com/felixgeelhaar/agent-go) - Source code and issues
