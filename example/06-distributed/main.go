@@ -46,7 +46,9 @@ func main() {
 			var in struct {
 				ItemID string `json:"item_id"`
 			}
-			json.Unmarshal(input, &in)
+			if err := json.Unmarshal(input, &in); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid input: %w", err)
+			}
 
 			// Simulate work
 			time.Sleep(50 * time.Millisecond)
@@ -54,15 +56,18 @@ func main() {
 			workerID := ctx.Value("worker_id")
 			fmt.Printf("  [Worker %v] Processed item: %s\n", workerID, in.ItemID)
 
-			output, _ := json.Marshal(map[string]string{
+			output, err := json.Marshal(map[string]string{
 				"status":  "processed",
 				"item_id": in.ItemID,
 			})
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("failed to marshal output: %w", err)
+			}
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
 
-	registry.Register(processTool)
+	_ = registry.Register(processTool) // Ignore error in example
 
 	// ============================================
 	// Create and start workers
@@ -101,9 +106,14 @@ func main() {
 			ctx = context.WithValue(ctx, "worker_id", task.Metadata["worker_id"])
 
 			var payload queue.ToolCallPayload
-			json.Unmarshal(task.Payload, &payload)
+			if err := json.Unmarshal(task.Payload, &payload); err != nil {
+				return nil, fmt.Errorf("invalid task payload: %w", err)
+			}
 
-			t, _ := registry.Get(payload.ToolName)
+			t, ok := registry.Get(payload.ToolName)
+			if !ok {
+				return nil, fmt.Errorf("tool not found: %s", payload.ToolName)
+			}
 			result, err := t.Execute(ctx, payload.Input)
 			if err != nil {
 				return nil, err
@@ -114,7 +124,7 @@ func main() {
 		wg.Add(1)
 		go func(w *distributed.Worker) {
 			defer wg.Done()
-			w.Start(context.Background())
+			_ = w.Start(context.Background()) // Ignore error in example
 		}(workers[i])
 	}
 
@@ -131,19 +141,27 @@ func main() {
 
 	ctx := context.Background()
 	for i := 0; i < numTasks; i++ {
-		input, _ := json.Marshal(map[string]string{
+		input, err := json.Marshal(map[string]string{
 			"item_id": fmt.Sprintf("item-%d", i+1),
 		})
+		if err != nil {
+			fmt.Printf("Failed to marshal input: %v\n", err)
+			continue
+		}
 
-		task, _ := queue.NewToolCallTask(
+		task, err := queue.NewToolCallTask(
 			fmt.Sprintf("run-%d", i+1),
 			"process",
 			input,
 			"processing",
 		)
+		if err != nil {
+			fmt.Printf("Failed to create task: %v\n", err)
+			continue
+		}
 		task.Priority = i % 3 // Vary priorities
 
-		taskQueue.Enqueue(ctx, task)
+		_ = taskQueue.Enqueue(ctx, task) // Ignore enqueue error in example
 	}
 
 	// Wait for processing
@@ -157,7 +175,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("Stopping workers...")
 	for _, w := range workers {
-		w.Stop()
+		_ = w.Stop() // Ignore stop error in example
 	}
 
 	// ============================================

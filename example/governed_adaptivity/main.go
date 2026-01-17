@@ -95,7 +95,7 @@ func simulateRuns(ctx context.Context, runStore *memory.RunStore, eventStore *me
 	for i := 0; i < 5; i++ {
 		runID := fmt.Sprintf("run-%d", i+1)
 		r := agent.NewRun(runID, fmt.Sprintf("Process task %d", i+1))
-		runStore.Save(ctx, r)
+		_ = runStore.Save(ctx, r) // Ignore error in example
 
 		// Simulate events for each run
 		simulateRunEvents(ctx, eventStore, runID, i)
@@ -134,14 +134,17 @@ func simulateRunEvents(ctx context.Context, eventStore *memory.EventStore, runID
 	}
 
 	for _, e := range events {
-		data, _ := json.Marshal(e.data)
+		data, err := json.Marshal(e.data)
+		if err != nil {
+			continue // Skip events that can't be marshaled
+		}
 		evt, err := event.NewEvent(runID, e.eventType, data)
 		if err != nil {
 			continue
 		}
 		// Override timestamp for realistic ordering
 		evt.Timestamp = baseTime.Add(e.offset)
-		eventStore.Append(ctx, evt)
+		_ = eventStore.Append(ctx, evt) // Ignore error in example
 	}
 }
 
@@ -165,7 +168,7 @@ func detectPatterns(ctx context.Context, eventStore *memory.EventStore, runStore
 
 	// Store patterns
 	for i := range patterns {
-		patternStore.Save(ctx, &patterns[i])
+		_ = patternStore.Save(ctx, &patterns[i]) // Ignore error in example
 	}
 
 	return patterns
@@ -188,7 +191,7 @@ func generateSuggestions(ctx context.Context, patterns []pattern.Pattern, sugges
 
 	// Store suggestions
 	for i := range suggestions {
-		suggestionStore.Save(ctx, &suggestions[i])
+		_ = suggestionStore.Save(ctx, &suggestions[i]) // Ignore error in example
 	}
 
 	return suggestions
@@ -222,7 +225,7 @@ func manageProposal(ctx context.Context, suggestions []suggestion.Suggestion, pr
 		Budgets:     budgetSnapshot,
 		Approvals:   policy.NewApprovalSnapshot(),
 	}
-	versionStore.Save(ctx, initialVersion)
+	_ = versionStore.Save(ctx, initialVersion) // Ignore error in example
 	fmt.Println("  Initial policy version: v0")
 
 	// Create workflow service with policy applier
@@ -269,7 +272,7 @@ func manageProposal(ctx context.Context, suggestions []suggestion.Suggestion, pr
 				)
 			}
 			if change != nil {
-				workflow.AddChange(ctx, prop.ID, *change)
+				_ = workflow.AddChange(ctx, prop.ID, *change) // Ignore error in example
 				changesAdded++
 			}
 		}
@@ -280,15 +283,15 @@ func manageProposal(ctx context.Context, suggestions []suggestion.Suggestion, pr
 			ToolName: "list_directory",
 			Allowed:  true,
 		}
-		change, _ := proposal.NewPolicyChange(
+		change, err := proposal.NewPolicyChange(
 			proposal.ChangeTypeEligibility,
 			"explore:list_directory",
 			"Add list_directory to explore state",
 			nil,
 			eligibilityChange,
 		)
-		if change != nil {
-			workflow.AddChange(ctx, prop.ID, *change)
+		if err == nil && change != nil {
+			_ = workflow.AddChange(ctx, prop.ID, *change) // Ignore error in example
 			changesAdded++
 		}
 	}

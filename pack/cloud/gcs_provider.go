@@ -170,7 +170,7 @@ func (p *GCSProvider) PutObject(ctx context.Context, bucket, key string, data io
 	}
 
 	if _, err := io.Copy(writer, data); err != nil {
-		writer.Close()
+		_ = writer.Close() // Close on error path, primary error already captured
 		return fmt.Errorf("failed to write object: %w", err)
 	}
 

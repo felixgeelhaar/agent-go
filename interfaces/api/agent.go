@@ -301,9 +301,11 @@ func WithRegistry(r tool.Registry) Option {
 
 // WithTool registers a tool with the engine's registry.
 // Can be called multiple times to register multiple tools.
+// If a tool with the same name already exists, it will be silently ignored.
+// Use WithRegistry to get full control over tool registration errors.
 func WithTool(t tool.Tool) Option {
 	return func(c *engineConfig) {
-		c.registry.Register(t)
+		_ = c.registry.Register(t) // Ignore duplicate registration errors
 	}
 }
 

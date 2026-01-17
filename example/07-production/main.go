@@ -86,7 +86,7 @@ func main() {
 
 			// Validate input
 			if err := pathSchema.Validate(input); err != nil {
-				auditLogger.Log(ctx, audit.Event{
+				_ = auditLogger.Log(ctx, audit.Event{
 					EventType:  audit.EventPolicyViolation,
 					ToolName:   "read_file",
 					Success:    false,
@@ -96,7 +96,7 @@ func main() {
 						"service": config.ServiceName,
 						"env":     config.Environment,
 					},
-				})
+				}) // Ignore audit log error, primary error returned below
 				return tool.Result{}, fmt.Errorf("invalid path: %w", err)
 			}
 
@@ -105,7 +105,7 @@ func main() {
 				return tool.Result{}, err
 			}
 
-			auditLogger.Log(ctx, audit.Event{
+			_ = auditLogger.Log(ctx, audit.Event{
 				EventType: audit.EventToolExecution,
 				ToolName:  "read_file",
 				Success:   true,
@@ -115,17 +115,20 @@ func main() {
 					"service": config.ServiceName,
 					"env":     config.Environment,
 				},
-			})
+			}) // Ignore audit log error in example
 
-			output, _ := json.Marshal(map[string]any{
+			output, err := json.Marshal(map[string]any{
 				"content": string(content),
 				"size":    len(content),
 			})
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("failed to marshal output: %w", err)
+			}
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
 
-	registry.Register(readFile)
+	_ = registry.Register(readFile) // Ignore error in example
 
 	fmt.Println("Tools registered")
 
@@ -267,7 +270,7 @@ Be concise in your responses.`,
 	}
 
 	// Log completion to audit trail
-	auditLogger.Log(ctx, audit.Event{
+	_ = auditLogger.Log(ctx, audit.Event{
 		EventType: audit.EventRunComplete,
 		RunID:     run.ID,
 		Success:   run.Status == agent.StatusCompleted,
@@ -276,7 +279,7 @@ Be concise in your responses.`,
 			"steps":    len(run.Evidence),
 			"duration": run.Duration().String(),
 		},
-	})
+	}) // Ignore audit log error in example
 }
 
 // Config holds application configuration

@@ -37,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Use explicit cleanup to ensure it runs even on error
-	cleanup := func() { os.RemoveAll(workDir) }
+	cleanup := func() { _ = os.RemoveAll(workDir) } // Ignore cleanup errors
 	defer cleanup()
 
 	fmt.Printf("=== FileOps Agent Example ===\n")

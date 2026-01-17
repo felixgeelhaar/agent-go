@@ -21,11 +21,16 @@ func main() {
 			var in struct {
 				Message string `json:"message"`
 			}
-			json.Unmarshal(input, &in)
+			if err := json.Unmarshal(input, &in); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid input: %w", err)
+			}
 
-			output, _ := json.Marshal(map[string]string{
+			output, err := json.Marshal(map[string]string{
 				"echoed": in.Message,
 			})
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("failed to marshal output: %w", err)
+			}
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
