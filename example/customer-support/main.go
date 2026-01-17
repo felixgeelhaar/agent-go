@@ -45,17 +45,6 @@ func runExample() error {
 
 	// Create tool registry with support tools
 	registry := api.NewToolRegistry()
-	tools := []struct {
-		name string
-		tool func(*MockDataStore) interface{ Name() string }
-	}{
-		{"lookup_customer", func(s *MockDataStore) interface{ Name() string } { return NewLookupCustomerTool(s) }},
-		{"get_order_status", func(s *MockDataStore) interface{ Name() string } { return NewGetOrderStatusTool(s) }},
-		{"search_kb", func(s *MockDataStore) interface{ Name() string } { return NewSearchKBTool(s) }},
-		{"create_ticket", func(s *MockDataStore) interface{ Name() string } { return NewCreateTicketTool(s) }},
-		{"escalate", func(s *MockDataStore) interface{ Name() string } { return NewEscalateTool(s) }},
-	}
-
 	if err := registry.Register(NewLookupCustomerTool(store)); err != nil {
 		return fmt.Errorf("failed to register lookup_customer: %w", err)
 	}
@@ -72,21 +61,15 @@ func runExample() error {
 		return fmt.Errorf("failed to register escalate: %w", err)
 	}
 
-	// Configure tool eligibility per state
-	eligibility := api.NewToolEligibility()
-	// Read-only tools allowed in explore state
-	eligibility.Allow(agent.StateExplore, "lookup_customer")
-	eligibility.Allow(agent.StateExplore, "get_order_status")
-	eligibility.Allow(agent.StateExplore, "search_kb")
-	// Action tools in act state
-	eligibility.Allow(agent.StateAct, "create_ticket")
-	eligibility.Allow(agent.StateAct, "escalate")
-	eligibility.Allow(agent.StateAct, "lookup_customer")
-	eligibility.Allow(agent.StateAct, "get_order_status")
-	// Validation can search KB
-	eligibility.Allow(agent.StateValidate, "search_kb")
-	eligibility.Allow(agent.StateValidate, "lookup_customer")
-	eligibility.Allow(agent.StateValidate, "get_order_status")
+	// Configure tool eligibility per state using declarative map
+	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
+		// Read-only tools allowed in explore state
+		agent.StateExplore: {"lookup_customer", "get_order_status", "search_kb"},
+		// Action tools (plus read-only) in act state
+		agent.StateAct: {"create_ticket", "escalate", "lookup_customer", "get_order_status"},
+		// Validation can verify customer and order info
+		agent.StateValidate: {"search_kb", "lookup_customer", "get_order_status"},
+	})
 
 	// Create a scripted planner that simulates handling a shipping delay complaint:
 	// Scenario: "Where is my order #38291? It's been 2 weeks!"
@@ -153,9 +136,6 @@ func runExample() error {
 				}`)),
 		},
 	)
-
-	// Discard unused variable
-	_ = tools
 
 	// Create the engine
 	engine, err := api.New(

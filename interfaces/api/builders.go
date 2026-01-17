@@ -40,14 +40,74 @@ func NewScriptedPlanner(steps ...planner.ScriptStep) *planner.ScriptedPlanner {
 // ScriptStep is a step in a scripted planner.
 type ScriptStep = planner.ScriptStep
 
-// NewToolEligibility creates a new tool eligibility configuration.
+// EligibilityRules maps states to the tools allowed in each state.
+// This is the preferred way to configure tool eligibility declaratively.
+//
+// Example:
+//
+//	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
+//	    api.StateExplore: {"read_file", "list_dir"},
+//	    api.StateAct:     {"write_file", "delete_file"},
+//	    api.StateValidate: {"read_file"},
+//	})
+type EligibilityRules = policy.EligibilityRules
+
+// TransitionRules maps states to the states they can transition to.
+// This is the preferred way to configure state transitions declaratively.
+//
+// Example:
+//
+//	transitions := api.NewStateTransitionsWith(api.TransitionRules{
+//	    api.StateIntake:   {api.StateExplore, api.StateFailed},
+//	    api.StateExplore:  {api.StateDecide, api.StateFailed},
+//	    api.StateDecide:   {api.StateAct, api.StateDone, api.StateFailed},
+//	})
+type TransitionRules = policy.TransitionRules
+
+// NewToolEligibility creates a new empty tool eligibility configuration.
+// Use the Allow or AllowMultiple methods to add rules.
+//
+// For declarative configuration, prefer NewToolEligibilityWith instead.
 func NewToolEligibility() *policy.ToolEligibility {
 	return policy.NewToolEligibility()
 }
 
-// NewStateTransitions creates a new state transitions configuration.
+// NewToolEligibilityWith creates a tool eligibility configuration from a rules map.
+// This is the preferred constructor for declarative, readable configuration.
+//
+// Example:
+//
+//	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
+//	    api.StateExplore: {"lookup_customer", "get_order_status", "search_kb"},
+//	    api.StateAct:     {"create_ticket", "escalate"},
+//	    api.StateValidate: {"search_kb"},
+//	})
+func NewToolEligibilityWith(rules EligibilityRules) *policy.ToolEligibility {
+	return policy.NewToolEligibilityWith(rules)
+}
+
+// NewStateTransitions creates a new empty state transitions configuration.
+// Use the Allow method to add rules, or use DefaultTransitions() for the canonical configuration.
+//
+// For declarative configuration, prefer NewStateTransitionsWith instead.
 func NewStateTransitions() *policy.StateTransitions {
 	return policy.NewStateTransitions()
+}
+
+// NewStateTransitionsWith creates a state transition configuration from a rules map.
+// This is the preferred constructor for declarative, readable configuration.
+//
+// Example:
+//
+//	transitions := api.NewStateTransitionsWith(api.TransitionRules{
+//	    api.StateIntake:   {api.StateExplore, api.StateFailed},
+//	    api.StateExplore:  {api.StateDecide, api.StateFailed},
+//	    api.StateDecide:   {api.StateAct, api.StateDone, api.StateFailed},
+//	    api.StateAct:      {api.StateValidate, api.StateFailed},
+//	    api.StateValidate: {api.StateDone, api.StateExplore, api.StateFailed},
+//	})
+func NewStateTransitionsWith(rules TransitionRules) *policy.StateTransitions {
+	return policy.NewStateTransitionsWith(rules)
 }
 
 // DefaultTransitions returns the canonical state transition configuration.

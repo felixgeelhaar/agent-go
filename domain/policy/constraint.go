@@ -14,11 +14,43 @@ type ToolEligibility struct {
 	allowed map[agent.State]map[string]bool
 }
 
-// NewToolEligibility creates a new tool eligibility configuration.
+// EligibilityRules maps states to the tools allowed in each state.
+// This is the preferred way to configure tool eligibility declaratively.
+//
+// Example:
+//
+//	rules := policy.EligibilityRules{
+//	    agent.StateExplore: {"read_file", "list_dir"},
+//	    agent.StateAct:     {"write_file", "delete_file"},
+//	    agent.StateValidate: {"read_file"},
+//	}
+//	eligibility := policy.NewToolEligibilityWith(rules)
+type EligibilityRules map[agent.State][]string
+
+// NewToolEligibility creates a new empty tool eligibility configuration.
+// Use the Allow or AllowMultiple methods to add rules.
 func NewToolEligibility() *ToolEligibility {
 	return &ToolEligibility{
 		allowed: make(map[agent.State]map[string]bool),
 	}
+}
+
+// NewToolEligibilityWith creates a tool eligibility configuration from a rules map.
+// This is the preferred constructor for declarative, readable configuration.
+//
+// Example:
+//
+//	eligibility := policy.NewToolEligibilityWith(policy.EligibilityRules{
+//	    agent.StateExplore: {"lookup_customer", "get_order_status", "search_kb"},
+//	    agent.StateAct:     {"create_ticket", "escalate"},
+//	    agent.StateValidate: {"search_kb"},
+//	})
+func NewToolEligibilityWith(rules EligibilityRules) *ToolEligibility {
+	e := NewToolEligibility()
+	for state, tools := range rules {
+		e.AllowMultiple(state, tools...)
+	}
+	return e
 }
 
 // Allow permits a tool in the given state.
@@ -71,11 +103,47 @@ type StateTransitions struct {
 	transitions map[agent.State][]agent.State
 }
 
-// NewStateTransitions creates a new state transition configuration.
+// TransitionRules maps states to the states they can transition to.
+// This is the preferred way to configure state transitions declaratively.
+//
+// Example:
+//
+//	rules := policy.TransitionRules{
+//	    agent.StateIntake:  {agent.StateExplore, agent.StateFailed},
+//	    agent.StateExplore: {agent.StateDecide, agent.StateFailed},
+//	    agent.StateDecide:  {agent.StateAct, agent.StateDone, agent.StateFailed},
+//	}
+//	transitions := policy.NewStateTransitionsWith(rules)
+type TransitionRules map[agent.State][]agent.State
+
+// NewStateTransitions creates a new empty state transition configuration.
+// Use the Allow method to add rules, or use DefaultTransitions() for the canonical configuration.
 func NewStateTransitions() *StateTransitions {
 	return &StateTransitions{
 		transitions: make(map[agent.State][]agent.State),
 	}
+}
+
+// NewStateTransitionsWith creates a state transition configuration from a rules map.
+// This is the preferred constructor for declarative, readable configuration.
+//
+// Example:
+//
+//	transitions := policy.NewStateTransitionsWith(policy.TransitionRules{
+//	    agent.StateIntake:   {agent.StateExplore, agent.StateFailed},
+//	    agent.StateExplore:  {agent.StateDecide, agent.StateFailed},
+//	    agent.StateDecide:   {agent.StateAct, agent.StateDone, agent.StateFailed},
+//	    agent.StateAct:      {agent.StateValidate, agent.StateFailed},
+//	    agent.StateValidate: {agent.StateDone, agent.StateExplore, agent.StateFailed},
+//	})
+func NewStateTransitionsWith(rules TransitionRules) *StateTransitions {
+	t := NewStateTransitions()
+	for from, toStates := range rules {
+		for _, to := range toStates {
+			t.Allow(from, to)
+		}
+	}
+	return t
 }
 
 // Allow permits a transition from one state to another.
@@ -105,20 +173,22 @@ func (t *StateTransitions) AllowedTransitions(from agent.State) []agent.State {
 }
 
 // DefaultTransitions returns the canonical state transition configuration.
+//
+// The default state machine flow is:
+//
+//	intake → explore → decide → act → validate → done
+//	                                    ↓
+//	                                  explore (loop back)
+//
+// All non-terminal states can transition to failed.
 func DefaultTransitions() *StateTransitions {
-	return NewStateTransitions().
-		Allow(agent.StateIntake, agent.StateExplore).
-		Allow(agent.StateIntake, agent.StateFailed).
-		Allow(agent.StateExplore, agent.StateDecide).
-		Allow(agent.StateExplore, agent.StateFailed).
-		Allow(agent.StateDecide, agent.StateAct).
-		Allow(agent.StateDecide, agent.StateDone).
-		Allow(agent.StateDecide, agent.StateFailed).
-		Allow(agent.StateAct, agent.StateValidate).
-		Allow(agent.StateAct, agent.StateFailed).
-		Allow(agent.StateValidate, agent.StateDone).
-		Allow(agent.StateValidate, agent.StateExplore). // Allow looping back
-		Allow(agent.StateValidate, agent.StateFailed)
+	return NewStateTransitionsWith(TransitionRules{
+		agent.StateIntake:   {agent.StateExplore, agent.StateFailed},
+		agent.StateExplore:  {agent.StateDecide, agent.StateFailed},
+		agent.StateDecide:   {agent.StateAct, agent.StateDone, agent.StateFailed},
+		agent.StateAct:      {agent.StateValidate, agent.StateFailed},
+		agent.StateValidate: {agent.StateDone, agent.StateExplore, agent.StateFailed},
+	})
 }
 
 // Constraint is a generic policy constraint that can be evaluated.

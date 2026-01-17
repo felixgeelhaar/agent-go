@@ -25,9 +25,10 @@
 //	    api.ScriptStep{ExpectState: api.StateDecide, Decision: api.NewFinishDecision("completed", result)},
 //	)
 //
-//	// 3. Configure tool eligibility
-//	eligibility := api.NewToolEligibility()
-//	eligibility.Allow(api.StateExplore, "echo")
+//	// 3. Configure tool eligibility (declarative style)
+//	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
+//	    api.StateExplore: {"echo"},
+//	})
 //
 //	// 4. Create and run the engine
 //	engine, _ := api.New(

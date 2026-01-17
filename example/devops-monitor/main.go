@@ -58,19 +58,15 @@ func runExample() error {
 		return fmt.Errorf("failed to register send_alert: %w", err)
 	}
 
-	// Configure tool eligibility per state
-	eligibility := api.NewToolEligibility()
-	// Read-only tools allowed in explore state
-	eligibility.Allow(agent.StateExplore, "get_metrics")
-	eligibility.Allow(agent.StateExplore, "query_logs")
-	// Action tools in act state (restart requires approval due to Destructive annotation)
-	eligibility.Allow(agent.StateAct, "restart_service")
-	eligibility.Allow(agent.StateAct, "send_alert")
-	eligibility.Allow(agent.StateAct, "get_metrics")
-	eligibility.Allow(agent.StateAct, "query_logs")
-	// Validation can check metrics
-	eligibility.Allow(agent.StateValidate, "get_metrics")
-	eligibility.Allow(agent.StateValidate, "query_logs")
+	// Configure tool eligibility per state using declarative map
+	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
+		// Read-only tools allowed in explore state
+		agent.StateExplore: {"get_metrics", "query_logs"},
+		// Action tools in act state (restart requires approval due to Destructive annotation)
+		agent.StateAct: {"restart_service", "send_alert", "get_metrics", "query_logs"},
+		// Validation can check metrics
+		agent.StateValidate: {"get_metrics", "query_logs"},
+	})
 
 	// Create a scripted planner that simulates incident response:
 	// Scenario: High error rate detected on api-gateway service
