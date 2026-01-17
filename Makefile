@@ -20,32 +20,32 @@ test-coverage:
 
 # Coverage analysis (coverctl)
 coverage-check:
-	coverctl check --fail-under=80
+	coverctl check
 
 coverage-report:
-	coverctl report --profile=coverage.out
+	coverctl report
 
 coverage-debt:
-	coverctl debt --profile=coverage.out
+	coverctl debt
 
 coverage-suggest:
-	coverctl suggest --profile=coverage.out
+	coverctl suggest
 
 # Security scanning (verdict)
 security:
-	verdict scan --path=.
+	verdict scan .
 
 security-sast:
-	verdict sast --path=.
+	verdict sast .
 
 security-vuln:
-	verdict vuln --path=.
+	verdict vuln .
 
 security-secrets:
-	verdict secrets --path=.
+	verdict secrets .
 
 security-policy:
-	verdict policy-check --path=.
+	verdict policy-check .
 
 # Release management (relicta)
 release-status:

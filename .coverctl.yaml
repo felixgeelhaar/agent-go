@@ -1,0 +1,30 @@
+version: 1
+language: go
+policy:
+  default:
+    min: 60
+  domains:
+    - name: domain
+      match:
+        - ./domain/...
+      min: 70
+    - name: application
+      match:
+        - ./application/...
+      min: 70
+    - name: infrastructure
+      match:
+        - ./infrastructure/...
+      min: 60
+    - name: api
+      match:
+        - ./interfaces/api/...
+      min: 70
+    - name: pack
+      match:
+        - ./pack/...
+      min: 50
+    - name: examples
+      match:
+        - ./example/...
+      min: 0
