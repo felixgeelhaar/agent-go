@@ -65,9 +65,21 @@ type EligibilityRules = policy.EligibilityRules
 type TransitionRules = policy.TransitionRules
 
 // NewToolEligibility creates a new empty tool eligibility configuration.
-// Use the Allow or AllowMultiple methods to add rules.
+// Use the Allow or AllowMultiple methods to add rules incrementally.
 //
-// For declarative configuration, prefer NewToolEligibilityWith instead.
+// Use this imperative style when:
+//   - Building eligibility dynamically based on runtime conditions
+//   - Adding tools conditionally or in a loop
+//   - Preferring method chaining for readability
+//
+// For static configuration, prefer NewToolEligibilityWith instead.
+//
+// Example:
+//
+//	eligibility := api.NewToolEligibility()
+//	eligibility.Allow(api.StateExplore, "read_file")
+//	eligibility.Allow(api.StateExplore, "list_dir")
+//	eligibility.Allow(api.StateAct, "write_file")
 func NewToolEligibility() *policy.ToolEligibility {
 	return policy.NewToolEligibility()
 }
@@ -87,9 +99,20 @@ func NewToolEligibilityWith(rules EligibilityRules) *policy.ToolEligibility {
 }
 
 // NewStateTransitions creates a new empty state transitions configuration.
-// Use the Allow method to add rules, or use DefaultTransitions() for the canonical configuration.
+// Use the Allow method to add rules incrementally.
 //
-// For declarative configuration, prefer NewStateTransitionsWith instead.
+// Use this imperative style when:
+//   - Building transitions dynamically based on runtime conditions
+//   - Adding transitions conditionally or in a loop
+//   - Preferring method chaining for readability
+//
+// For static configuration, prefer NewStateTransitionsWith or DefaultTransitions instead.
+//
+// Example:
+//
+//	transitions := api.NewStateTransitions()
+//	transitions.Allow(api.StateIntake, api.StateExplore)
+//	transitions.Allow(api.StateExplore, api.StateDecide)
 func NewStateTransitions() *policy.StateTransitions {
 	return policy.NewStateTransitions()
 }

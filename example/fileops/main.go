@@ -69,15 +69,22 @@ func runExample(workDir string) error {
 		return fmt.Errorf("failed to register list_dir: %w", err)
 	}
 
-	// Configure tool eligibility per state using declarative map
-	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
-		// Read-only tools allowed in explore state
-		agent.StateExplore: {"read_file", "list_dir"},
-		// All tools allowed in act state
-		agent.StateAct: {"read_file", "write_file", "delete_file", "list_dir"},
-		// Read-only in validate state
-		agent.StateValidate: {"read_file", "list_dir"},
-	})
+	// Configure tool eligibility per state using imperative builder pattern.
+	// This approach is useful when building eligibility dynamically or
+	// when you prefer method chaining. For static configuration, consider
+	// using NewToolEligibilityWith() with a declarative map instead.
+	eligibility := api.NewToolEligibility()
+	// Read-only tools allowed in explore state
+	eligibility.Allow(agent.StateExplore, "read_file")
+	eligibility.Allow(agent.StateExplore, "list_dir")
+	// All tools allowed in act state
+	eligibility.Allow(agent.StateAct, "read_file")
+	eligibility.Allow(agent.StateAct, "write_file")
+	eligibility.Allow(agent.StateAct, "delete_file")
+	eligibility.Allow(agent.StateAct, "list_dir")
+	// Read-only in validate state
+	eligibility.Allow(agent.StateValidate, "read_file")
+	eligibility.Allow(agent.StateValidate, "list_dir")
 
 	// Create a scripted planner that simulates an agent workflow:
 	// 1. List directory (explore)
