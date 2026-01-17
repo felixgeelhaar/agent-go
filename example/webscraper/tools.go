@@ -443,9 +443,12 @@ func extractLinks(html string, baseURL *url.URL) []LinkInfo {
 		text := stripHTMLTags(match[2])
 		text = cleanWhitespace(text)
 
-		// Skip empty hrefs, javascript, and anchors
+		// Skip empty hrefs, anchors, and dangerous URL schemes
+		// CodeQL: go/incomplete-url-scheme-check - must check all dangerous schemes
 		if href == "" || strings.HasPrefix(href, "#") ||
-			strings.HasPrefix(href, "javascript:") {
+			strings.HasPrefix(href, "javascript:") ||
+			strings.HasPrefix(href, "data:") ||
+			strings.HasPrefix(href, "vbscript:") {
 			continue
 		}
 
