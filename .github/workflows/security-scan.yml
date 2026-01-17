@@ -27,8 +27,16 @@ jobs:
           go-version: '1.23'
           cache: true
 
-      - name: Install Verdict
-        run: go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+      - name: Install Verdict and Engines
+        run: |
+          # Install verdict
+          go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
+
+          # Install security engines
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/gitleaks/gitleaks/v8@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Run Verdict Security Scan
         run: verdict scan --sarif --output verdict-results.sarif .
@@ -36,6 +44,7 @@ jobs:
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
         with:
           sarif_file: verdict-results.sarif
 
