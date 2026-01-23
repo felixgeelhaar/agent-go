@@ -1,5 +1,9 @@
 // Package main demonstrates a production-ready agent setup.
-// Combines all features: LLM planning, observability, security, and error handling.
+// Combines all features: observability, security, and error handling.
+//
+// Note: For real LLM planning, use contrib/planner-llm:
+//
+//	import llmplanner "github.com/felixgeelhaar/agent-go/contrib/planner-llm"
 package main
 
 import (
@@ -11,12 +15,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	agent "github.com/felixgeelhaar/agent-go/interfaces/api"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	"github.com/felixgeelhaar/agent-go/infrastructure/observability"
-	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
 	"github.com/felixgeelhaar/agent-go/infrastructure/security/audit"
 	"github.com/felixgeelhaar/agent-go/infrastructure/security/validation"
+	agent "github.com/felixgeelhaar/agent-go/interfaces/api"
 )
 
 func main() {
@@ -87,10 +90,10 @@ func main() {
 			// Validate input
 			if err := pathSchema.Validate(input); err != nil {
 				_ = auditLogger.Log(ctx, audit.Event{
-					EventType:  audit.EventPolicyViolation,
-					ToolName:   "read_file",
-					Success:    false,
-					Error:      err.Error(),
+					EventType: audit.EventPolicyViolation,
+					ToolName:  "read_file",
+					Success:   false,
+					Error:     err.Error(),
 					Annotations: map[string]interface{}{
 						"path":    in.Path,
 						"service": config.ServiceName,
@@ -135,42 +138,39 @@ func main() {
 	// ============================================
 	// Set up planner
 	// ============================================
+	//
+	// For real LLM planning, use contrib/planner-llm:
+	//
+	//   import llmplanner "github.com/felixgeelhaar/agent-go/contrib/planner-llm"
+	//
+	//   provider := llmplanner.NewAnthropicProvider(llmplanner.AnthropicConfig{
+	//       APIKey:  config.AnthropicKey,
+	//       Model:   "claude-sonnet-4-20250514",
+	//       Timeout: 30,
+	//   })
+	//
+	//   agentPlanner := llmplanner.NewLLMPlanner(llmplanner.LLMPlannerConfig{
+	//       Provider:    provider,
+	//       Temperature: 0.3,
+	//       SystemPrompt: `You are a helpful file assistant...`,
+	//   })
 
-	var agentPlanner planner.Planner
-
-	if config.AnthropicKey != "" {
-		provider := planner.NewAnthropicProvider(planner.AnthropicConfig{
-			APIKey:  config.AnthropicKey,
-			Model:   "claude-sonnet-4-20250514",
-			Timeout: 30,
-		})
-
-		agentPlanner = planner.NewLLMPlanner(planner.LLMPlannerConfig{
-			Provider:    provider,
-			Temperature: 0.3,
-			SystemPrompt: `You are a helpful file assistant. You can read files to answer questions.
-Always validate that files exist before reading.
-Be concise in your responses.`,
-		})
-		fmt.Println("LLM planner initialized (Anthropic)")
-	} else {
-		// Fallback to scripted planner for demo
-		agentPlanner = agent.NewScriptedPlanner(
-			agent.ScriptStep{
-				ExpectState: agent.StateIntake,
-				Decision:    agent.NewTransitionDecision(agent.StateExplore, "starting"),
-			},
-			agent.ScriptStep{
-				ExpectState: agent.StateExplore,
-				Decision:    agent.NewTransitionDecision(agent.StateDecide, "no API key, finishing"),
-			},
-			agent.ScriptStep{
-				ExpectState: agent.StateDecide,
-				Decision:    agent.NewFinishDecision("No API key configured", nil),
-			},
-		)
-		fmt.Println("Using scripted planner (set ANTHROPIC_API_KEY for LLM)")
-	}
+	// Using scripted planner for demonstration
+	agentPlanner := agent.NewScriptedPlanner(
+		agent.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision:    agent.NewTransitionDecision(agent.StateExplore, "starting"),
+		},
+		agent.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision:    agent.NewTransitionDecision(agent.StateDecide, "demonstration mode"),
+		},
+		agent.ScriptStep{
+			ExpectState: agent.StateDecide,
+			Decision:    agent.NewFinishDecision("Production example completed (use LLM planner for real planning)", nil),
+		},
+	)
+	fmt.Println("Using scripted planner (use contrib/planner-llm for LLM planning)")
 
 	// ============================================
 	// Set up policies

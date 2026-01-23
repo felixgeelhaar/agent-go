@@ -1,18 +1,45 @@
 .PHONY: all build test lint clean coverage coverage-check coverage-report \
         security security-sast security-vuln security-secrets \
         release-plan release-bump release-notes release-publish \
-        check example help
+        check example help \
+        workspace-sync workspace-tidy contrib-build contrib-test
 
 # Default target
 all: build test lint
 
-# Build
+# Build (workspace-aware)
 build:
 	go build ./...
 
-# Test
+# Build core only
+build-core:
+	go build -mod=mod ./domain/... ./application/... ./interfaces/... ./infrastructure/...
+
+# Build all contrib modules individually
+contrib-build:
+	@echo "Building contrib modules..."
+	@for dir in contrib/*/; do \
+		echo "Building $$dir"; \
+		(cd "$$dir" && go build ./...) || exit 1; \
+	done
+	@echo "All contrib modules built successfully"
+
+# Test (workspace-aware)
 test:
 	go test -race -v ./...
+
+# Test core only
+test-core:
+	go test -race -v ./domain/... ./application/... ./interfaces/... ./infrastructure/... ./test/...
+
+# Test all contrib modules individually
+contrib-test:
+	@echo "Testing contrib modules..."
+	@for dir in contrib/*/; do \
+		echo "Testing $$dir"; \
+		(cd "$$dir" && go test -race ./...) || exit 1; \
+	done
+	@echo "All contrib module tests passed"
 
 # Test with coverage
 test-coverage:
@@ -69,9 +96,13 @@ release-publish:
 release-validate:
 	relicta validate-release
 
-# Lint
+# Lint (workspace-aware)
 lint:
 	golangci-lint run ./...
+
+# Lint core only
+lint-core:
+	golangci-lint run ./domain/... ./application/... ./interfaces/... ./infrastructure/...
 
 # Clean
 clean:
@@ -82,6 +113,26 @@ clean:
 example:
 	go run ./example/fileops
 
+# Workspace management
+workspace-sync:
+	go work sync
+
+workspace-tidy:
+	@echo "Tidying all modules..."
+	go mod tidy
+	@for dir in contrib/*/; do \
+		echo "Tidying $$dir"; \
+		(cd "$$dir" && go mod tidy) || exit 1; \
+	done
+	@echo "All modules tidied"
+
+# Verify workspace
+workspace-verify:
+	@echo "Verifying workspace..."
+	go work sync
+	go build ./...
+	@echo "Workspace verified successfully"
+
 # All checks (CI/CD)
 check: lint test-coverage coverage-check security
 
@@ -90,8 +141,12 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "  Build & Test:"
-	@echo "    build            - Build all packages"
-	@echo "    test             - Run tests with race detection"
+	@echo "    build            - Build all packages (workspace)"
+	@echo "    build-core       - Build core packages only"
+	@echo "    contrib-build    - Build all contrib modules individually"
+	@echo "    test             - Run tests with race detection (workspace)"
+	@echo "    test-core        - Run core tests only"
+	@echo "    contrib-test     - Test all contrib modules individually"
 	@echo "    test-coverage    - Run tests with coverage profile"
 	@echo ""
 	@echo "  Coverage (coverctl):"
@@ -116,8 +171,14 @@ help:
 	@echo "    release-publish  - Execute release (create tags, run plugins)"
 	@echo "    release-validate - Run pre-flight validation"
 	@echo ""
+	@echo "  Workspace Management:"
+	@echo "    workspace-sync   - Sync go.work with all modules"
+	@echo "    workspace-tidy   - Run go mod tidy on all modules"
+	@echo "    workspace-verify - Verify workspace builds correctly"
+	@echo ""
 	@echo "  Other:"
-	@echo "    lint             - Run golangci-lint"
+	@echo "    lint             - Run golangci-lint (workspace)"
+	@echo "    lint-core        - Run golangci-lint on core only"
 	@echo "    clean            - Remove generated files"
 	@echo "    example          - Run the fileops example"
 	@echo "    check            - Run all CI checks"

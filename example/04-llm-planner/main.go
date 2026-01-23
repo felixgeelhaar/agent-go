@@ -1,5 +1,13 @@
-// Package main demonstrates using a real LLM provider for planning.
-// Shows how to swap from scripted to intelligent planning.
+// Package main demonstrates how to use LLM planners for intelligent planning.
+// Shows how to integrate with contrib/planner-llm for real LLM backends.
+//
+// Note: LLM provider implementations have been moved to contrib/planner-llm.
+// To use real LLM planners, import:
+//
+//	import "github.com/felixgeelhaar/agent-go/contrib/planner-llm"
+//
+// This example uses the ScriptedPlanner to demonstrate the planning interface
+// without requiring external API keys.
 package main
 
 import (
@@ -7,19 +15,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
-	agent "github.com/felixgeelhaar/agent-go/interfaces/api"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
-	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
+	agent "github.com/felixgeelhaar/agent-go/interfaces/api"
 )
 
 func main() {
-	// Check for API keys
-	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
-	openaiKey := os.Getenv("OPENAI_API_KEY")
-	ollamaURL := os.Getenv("OLLAMA_URL") // e.g., http://localhost:11434
-
 	// ============================================
 	// Create tools for the agent
 	// ============================================
@@ -74,93 +75,57 @@ func main() {
 		MustBuild()
 
 	// ============================================
-	// Select LLM provider based on available credentials
+	// Create a planner
 	// ============================================
+	//
+	// For real LLM planning, use contrib/planner-llm:
+	//
+	//   import llmplanner "github.com/felixgeelhaar/agent-go/contrib/planner-llm"
+	//
+	//   provider := llmplanner.NewAnthropicProvider(llmplanner.AnthropicConfig{
+	//       APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+	//       Model:  "claude-sonnet-4-20250514",
+	//   })
+	//
+	//   planner := llmplanner.NewLLMPlanner(llmplanner.LLMPlannerConfig{
+	//       Provider:    provider,
+	//       Temperature: 0.3,
+	//       SystemPrompt: "You are a helpful calculator agent...",
+	//   })
+	//
+	// This example uses ScriptedPlanner to demonstrate the flow.
 
-	var llmPlanner planner.Planner
-	var providerName string
+	fmt.Println("=== Planner Example ===")
+	fmt.Println()
+	fmt.Println("This example demonstrates the planning interface using ScriptedPlanner.")
+	fmt.Println("For real LLM planning, use contrib/planner-llm with your API keys.")
+	fmt.Println()
 
-	switch {
-	case anthropicKey != "":
-		providerName = "Anthropic (Claude)"
-		provider := planner.NewAnthropicProvider(planner.AnthropicConfig{
-			APIKey: anthropicKey,
-			Model:  "claude-sonnet-4-20250514",
-		})
-		llmPlanner = planner.NewLLMPlanner(planner.LLMPlannerConfig{
-			Provider:    provider,
-			Temperature: 0.3,
-			SystemPrompt: `You are a helpful calculator agent. You can perform arithmetic operations.
-When given a math problem, use the calculate tool to solve it step by step.
-After getting the result, finish with the final answer.`,
-		})
-
-	case openaiKey != "":
-		providerName = "OpenAI (GPT-4)"
-		provider := planner.NewOpenAIProvider(planner.OpenAIConfig{
-			APIKey: openaiKey,
-			Model:  "gpt-4-turbo",
-		})
-		llmPlanner = planner.NewLLMPlanner(planner.LLMPlannerConfig{
-			Provider:    provider,
-			Temperature: 0.3,
-			SystemPrompt: `You are a helpful calculator agent. Use the calculate tool for arithmetic.`,
-		})
-
-	case ollamaURL != "":
-		providerName = "Ollama (Local)"
-		provider := planner.NewOllamaProvider(planner.OllamaConfig{
-			BaseURL: ollamaURL,
-			Model:   "llama3",
-		})
-		llmPlanner = planner.NewLLMPlanner(planner.LLMPlannerConfig{
-			Provider:    provider,
-			Temperature: 0.3,
-		})
-
-	default:
-		fmt.Println("=== LLM Planner Example ===")
-		fmt.Println()
-		fmt.Println("No LLM provider configured. Set one of:")
-		fmt.Println("  - ANTHROPIC_API_KEY for Claude")
-		fmt.Println("  - OPENAI_API_KEY for GPT-4")
-		fmt.Println("  - OLLAMA_URL for local Ollama (e.g., http://localhost:11434)")
-		fmt.Println()
-		fmt.Println("Running with MockPlanner instead...")
-		fmt.Println()
-
-		// Fall back to mock planner for demonstration
-		providerName = "Mock (Demonstration)"
-		llmPlanner = agent.NewScriptedPlanner(
-			agent.ScriptStep{
-				ExpectState: agent.StateIntake,
-				Decision:    agent.NewTransitionDecision(agent.StateExplore, "starting calculation"),
-			},
-			agent.ScriptStep{
-				ExpectState: agent.StateExplore,
-				Decision: agent.NewCallToolDecision("calculate",
-					json.RawMessage(`{"operation":"multiply","a":15,"b":7}`),
-					"multiplying 15 by 7"),
-			},
-			agent.ScriptStep{
-				ExpectState: agent.StateExplore,
-				Decision:    agent.NewTransitionDecision(agent.StateDecide, "calculation complete"),
-			},
-			agent.ScriptStep{
-				ExpectState: agent.StateDecide,
-				Decision: agent.NewFinishDecision("The result of 15 × 7 = 105",
-					json.RawMessage(`{"answer":105}`)),
-			},
-		)
-	}
+	planner := agent.NewScriptedPlanner(
+		agent.ScriptStep{
+			ExpectState: agent.StateIntake,
+			Decision:    agent.NewTransitionDecision(agent.StateExplore, "starting calculation"),
+		},
+		agent.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision: agent.NewCallToolDecision("calculate",
+				json.RawMessage(`{"operation":"multiply","a":15,"b":7}`),
+				"multiplying 15 by 7"),
+		},
+		agent.ScriptStep{
+			ExpectState: agent.StateExplore,
+			Decision:    agent.NewTransitionDecision(agent.StateDecide, "calculation complete"),
+		},
+		agent.ScriptStep{
+			ExpectState: agent.StateDecide,
+			Decision: agent.NewFinishDecision("The result of 15 × 7 = 105",
+				json.RawMessage(`{"answer":105}`)),
+		},
+	)
 
 	// ============================================
 	// Build and run the engine
 	// ============================================
-
-	fmt.Println("=== LLM Planner Example ===")
-	fmt.Printf("Provider: %s\n", providerName)
-	fmt.Println()
 
 	eligibility := agent.NewToolEligibility()
 	eligibility.Allow(agent.StateExplore, "calculate")
@@ -168,7 +133,7 @@ After getting the result, finish with the final answer.`,
 
 	engine, err := agent.New(
 		agent.WithTool(calculateTool),
-		agent.WithPlanner(llmPlanner),
+		agent.WithPlanner(planner),
 		agent.WithToolEligibility(eligibility),
 		agent.WithBudget("tool_calls", 10),
 		agent.WithMaxSteps(20),

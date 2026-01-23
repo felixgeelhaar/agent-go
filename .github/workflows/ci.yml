@@ -22,6 +22,9 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      - name: Sync workspace
+        run: go work sync
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
@@ -29,8 +32,8 @@ jobs:
           args: --timeout=5m
         continue-on-error: true  # Allow CI to pass while golangci-lint catches up to Go 1.25
 
-  test:
-    name: Test
+  test-core:
+    name: Test Core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,14 +44,75 @@ jobs:
           go-version: '1.25'
           cache: true
 
-      - name: Run tests
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Run core tests
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./domain/... ./application/... ./interfaces/... ./infrastructure/... ./test/...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
           fail_ci_if_error: false
+
+  test-contrib:
+    name: Test Contrib Modules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - storage-postgres
+          - storage-mongodb
+          - storage-redis
+          - storage-sqlite
+          - storage-badger
+          - storage-dynamodb
+          - storage-gcs
+          - storage-etcd
+          - storage-nats
+          - pack-http
+          - pack-filesystem
+          - pack-shell
+          - pack-git
+          - pack-cloud
+          - pack-database
+          - pack-kubernetes
+          - pack-messaging
+          - pack-search
+          - pack-secrets
+          - pack-llm
+          - pack-vectordb
+          - pack-image
+          - pack-monitoring
+          - pack-notification
+          - pack-email
+          - pack-pdf
+          - pack-copilot
+          - pack-fileops
+          - planner-llm
+          - dashboard
+          - mcp
+          - distributed
+          - approval-slack
+          - otel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          cd contrib/${{ matrix.module }}
+          go test -race ./...
 
   build:
     name: Build
@@ -62,11 +126,21 @@ jobs:
           go-version: '1.25'
           cache: true
 
-      - name: Build
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Build workspace
         run: go build ./...
 
-      - name: Verify dependencies
+      - name: Verify core dependencies
         run: go mod verify
+
+      - name: Verify contrib modules build independently
+        run: |
+          for dir in contrib/*/; do
+            echo "Building $dir"
+            (cd "$dir" && go build ./...)
+          done
 
   security:
     name: Security
@@ -79,6 +153,9 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+
+      - name: Sync workspace
+        run: go work sync
 
       - name: Run govulncheck
         run: |
