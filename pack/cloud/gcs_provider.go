@@ -98,11 +98,7 @@ func (p *GCSProvider) ListObjects(ctx context.Context, bucket, prefix string, ma
 	count := 0
 	it := p.client.Bucket(bucket).Objects(ctx, query)
 
-	for {
-		if maxKeys > 0 && count >= maxKeys {
-			break
-		}
-
+	for maxKeys <= 0 || count < maxKeys {
 		attrs, err := it.Next()
 		if err == iterator.Done {
 			break

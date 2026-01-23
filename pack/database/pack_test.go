@@ -54,7 +54,7 @@ func TestNew(t *testing.T) {
 	}
 
 	if p == nil {
-		t.Error("expected non-nil pack")
+		t.Fatal("expected non-nil pack")
 	}
 
 	if p.Name != "database" {

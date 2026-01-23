@@ -14,21 +14,6 @@ import (
 	api "github.com/felixgeelhaar/agent-go/interfaces/api"
 )
 
-// mockMiddlewareTool implements tool.Tool for middleware testing.
-type mockMiddlewareTool struct {
-	name        string
-	annotations tool.Annotations
-}
-
-func (m mockMiddlewareTool) Name() string                  { return m.name }
-func (m mockMiddlewareTool) Description() string           { return "mock tool" }
-func (m mockMiddlewareTool) Annotations() tool.Annotations { return m.annotations }
-func (m mockMiddlewareTool) InputSchema() tool.Schema      { return tool.Schema{} }
-func (m mockMiddlewareTool) OutputSchema() tool.Schema     { return tool.Schema{} }
-func (m mockMiddlewareTool) Execute(ctx context.Context, input json.RawMessage) (tool.Result, error) {
-	return tool.Result{Output: json.RawMessage(`{"status":"ok"}`)}, nil
-}
-
 func TestNewMiddlewareRegistry(t *testing.T) {
 	t.Parallel()
 

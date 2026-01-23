@@ -129,156 +129,156 @@ func (a *App) inspectText(config *api.AgentConfig, section string) error {
 }
 
 func (a *App) printHeader(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Agent Configuration: %s\n", config.Name)
-	fmt.Fprintf(a.stdout, "═══════════════════════════════════════\n")
-	fmt.Fprintf(a.stdout, "Version: %s\n", config.Version)
+	_, _ = fmt.Fprintf(a.stdout, "Agent Configuration: %s\n", config.Name)
+	_, _ = fmt.Fprintf(a.stdout, "═══════════════════════════════════════\n")
+	_, _ = fmt.Fprintf(a.stdout, "Version: %s\n", config.Version)
 	if config.Description != "" {
-		fmt.Fprintf(a.stdout, "Description: %s\n", config.Description)
+		_, _ = fmt.Fprintf(a.stdout, "Description: %s\n", config.Description)
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printAgentSection(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Agent Settings\n")
-	fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
-	fmt.Fprintf(a.stdout, "  Max Steps: %d\n", config.Agent.MaxSteps)
+	_, _ = fmt.Fprintf(a.stdout, "Agent Settings\n")
+	_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(a.stdout, "  Max Steps: %d\n", config.Agent.MaxSteps)
 	if config.Agent.InitialState != "" {
-		fmt.Fprintf(a.stdout, "  Initial State: %s\n", config.Agent.InitialState)
+		_, _ = fmt.Fprintf(a.stdout, "  Initial State: %s\n", config.Agent.InitialState)
 	}
 	if config.Agent.DefaultGoal != "" {
-		fmt.Fprintf(a.stdout, "  Default Goal: %s\n", config.Agent.DefaultGoal)
+		_, _ = fmt.Fprintf(a.stdout, "  Default Goal: %s\n", config.Agent.DefaultGoal)
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printToolsSection(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Tools Configuration\n")
-	fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(a.stdout, "Tools Configuration\n")
+	_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
 
 	if len(config.Tools.Packs) == 0 && len(config.Tools.Inline) == 0 {
-		fmt.Fprintf(a.stdout, "  No tools configured\n")
+		_, _ = fmt.Fprintf(a.stdout, "  No tools configured\n")
 	} else {
 		if len(config.Tools.Packs) > 0 {
-			fmt.Fprintf(a.stdout, "  Packs (%d):\n", len(config.Tools.Packs))
+			_, _ = fmt.Fprintf(a.stdout, "  Packs (%d):\n", len(config.Tools.Packs))
 			for _, pack := range config.Tools.Packs {
-				fmt.Fprintf(a.stdout, "    • %s", pack.Name)
+				_, _ = fmt.Fprintf(a.stdout, "    • %s", pack.Name)
 				if pack.Version != "" {
-					fmt.Fprintf(a.stdout, " v%s", pack.Version)
+					_, _ = fmt.Fprintf(a.stdout, " v%s", pack.Version)
 				}
-				fmt.Fprintln(a.stdout)
+				_, _ = fmt.Fprintln(a.stdout)
 			}
 		}
 
 		if len(config.Tools.Inline) > 0 {
-			fmt.Fprintf(a.stdout, "  Inline Tools (%d):\n", len(config.Tools.Inline))
+			_, _ = fmt.Fprintf(a.stdout, "  Inline Tools (%d):\n", len(config.Tools.Inline))
 			for _, tool := range config.Tools.Inline {
-				fmt.Fprintf(a.stdout, "    • %s", tool.Name)
+				_, _ = fmt.Fprintf(a.stdout, "    • %s", tool.Name)
 				if tool.Description != "" {
-					fmt.Fprintf(a.stdout, " - %s", tool.Description)
+					_, _ = fmt.Fprintf(a.stdout, " - %s", tool.Description)
 				}
-				fmt.Fprintln(a.stdout)
+				_, _ = fmt.Fprintln(a.stdout)
 			}
 		}
 
 		if len(config.Tools.Eligibility) > 0 {
-			fmt.Fprintf(a.stdout, "  Eligibility:\n")
+			_, _ = fmt.Fprintf(a.stdout, "  Eligibility:\n")
 			for state, tools := range config.Tools.Eligibility {
-				fmt.Fprintf(a.stdout, "    %s: %d tools\n", state, len(tools))
+				_, _ = fmt.Fprintf(a.stdout, "    %s: %d tools\n", state, len(tools))
 			}
 		}
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printPolicySection(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Policy Configuration\n")
-	fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(a.stdout, "Policy Configuration\n")
+	_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
 
 	if len(config.Policy.Budgets) > 0 {
-		fmt.Fprintf(a.stdout, "  Budgets:\n")
+		_, _ = fmt.Fprintf(a.stdout, "  Budgets:\n")
 		for name, limit := range config.Policy.Budgets {
-			fmt.Fprintf(a.stdout, "    • %s: %d\n", name, limit)
+			_, _ = fmt.Fprintf(a.stdout, "    • %s: %d\n", name, limit)
 		}
 	}
 
-	fmt.Fprintf(a.stdout, "  Approval:\n")
-	fmt.Fprintf(a.stdout, "    Mode: %s\n", config.Policy.Approval.Mode)
-	fmt.Fprintf(a.stdout, "    Require for Destructive: %v\n", config.Policy.Approval.RequireForDestructive)
+	_, _ = fmt.Fprintf(a.stdout, "  Approval:\n")
+	_, _ = fmt.Fprintf(a.stdout, "    Mode: %s\n", config.Policy.Approval.Mode)
+	_, _ = fmt.Fprintf(a.stdout, "    Require for Destructive: %v\n", config.Policy.Approval.RequireForDestructive)
 
 	if config.Policy.RateLimit.Enabled {
-		fmt.Fprintf(a.stdout, "  Rate Limiting:\n")
-		fmt.Fprintf(a.stdout, "    Enabled: true\n")
-		fmt.Fprintf(a.stdout, "    Rate: %d/s\n", config.Policy.RateLimit.Rate)
-		fmt.Fprintf(a.stdout, "    Burst: %d\n", config.Policy.RateLimit.Burst)
+		_, _ = fmt.Fprintf(a.stdout, "  Rate Limiting:\n")
+		_, _ = fmt.Fprintf(a.stdout, "    Enabled: true\n")
+		_, _ = fmt.Fprintf(a.stdout, "    Rate: %d/s\n", config.Policy.RateLimit.Rate)
+		_, _ = fmt.Fprintf(a.stdout, "    Burst: %d\n", config.Policy.RateLimit.Burst)
 		if config.Policy.RateLimit.PerTool {
-			fmt.Fprintf(a.stdout, "    Per-Tool: true\n")
+			_, _ = fmt.Fprintf(a.stdout, "    Per-Tool: true\n")
 		}
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printResilienceSection(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Resilience Configuration\n")
-	fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(a.stdout, "Resilience Configuration\n")
+	_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
 
 	if config.Resilience.Timeout.Duration() > 0 {
-		fmt.Fprintf(a.stdout, "  Timeout: %s\n", config.Resilience.Timeout.Duration())
+		_, _ = fmt.Fprintf(a.stdout, "  Timeout: %s\n", config.Resilience.Timeout.Duration())
 	}
 
 	if config.Resilience.Retry.Enabled {
-		fmt.Fprintf(a.stdout, "  Retry:\n")
-		fmt.Fprintf(a.stdout, "    Max Attempts: %d\n", config.Resilience.Retry.MaxAttempts)
-		fmt.Fprintf(a.stdout, "    Initial Delay: %s\n", config.Resilience.Retry.InitialDelay.Duration())
-		fmt.Fprintf(a.stdout, "    Multiplier: %.1f\n", config.Resilience.Retry.Multiplier)
+		_, _ = fmt.Fprintf(a.stdout, "  Retry:\n")
+		_, _ = fmt.Fprintf(a.stdout, "    Max Attempts: %d\n", config.Resilience.Retry.MaxAttempts)
+		_, _ = fmt.Fprintf(a.stdout, "    Initial Delay: %s\n", config.Resilience.Retry.InitialDelay.Duration())
+		_, _ = fmt.Fprintf(a.stdout, "    Multiplier: %.1f\n", config.Resilience.Retry.Multiplier)
 	}
 
 	if config.Resilience.CircuitBreaker.Enabled {
-		fmt.Fprintf(a.stdout, "  Circuit Breaker:\n")
-		fmt.Fprintf(a.stdout, "    Threshold: %d failures\n", config.Resilience.CircuitBreaker.Threshold)
-		fmt.Fprintf(a.stdout, "    Timeout: %s\n", config.Resilience.CircuitBreaker.Timeout.Duration())
+		_, _ = fmt.Fprintf(a.stdout, "  Circuit Breaker:\n")
+		_, _ = fmt.Fprintf(a.stdout, "    Threshold: %d failures\n", config.Resilience.CircuitBreaker.Threshold)
+		_, _ = fmt.Fprintf(a.stdout, "    Timeout: %s\n", config.Resilience.CircuitBreaker.Timeout.Duration())
 	}
 
 	if config.Resilience.Bulkhead.Enabled {
-		fmt.Fprintf(a.stdout, "  Bulkhead:\n")
-		fmt.Fprintf(a.stdout, "    Max Concurrent: %d\n", config.Resilience.Bulkhead.MaxConcurrent)
+		_, _ = fmt.Fprintf(a.stdout, "  Bulkhead:\n")
+		_, _ = fmt.Fprintf(a.stdout, "    Max Concurrent: %d\n", config.Resilience.Bulkhead.MaxConcurrent)
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printNotificationSection(config *api.AgentConfig) {
-	fmt.Fprintf(a.stdout, "Notification Configuration\n")
-	fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+	_, _ = fmt.Fprintf(a.stdout, "Notification Configuration\n")
+	_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
 
 	if !config.Notification.Enabled {
-		fmt.Fprintf(a.stdout, "  Enabled: false\n")
+		_, _ = fmt.Fprintf(a.stdout, "  Enabled: false\n")
 	} else {
-		fmt.Fprintf(a.stdout, "  Enabled: true\n")
+		_, _ = fmt.Fprintf(a.stdout, "  Enabled: true\n")
 		if len(config.Notification.Endpoints) > 0 {
-			fmt.Fprintf(a.stdout, "  Endpoints (%d):\n", len(config.Notification.Endpoints))
+			_, _ = fmt.Fprintf(a.stdout, "  Endpoints (%d):\n", len(config.Notification.Endpoints))
 			for _, ep := range config.Notification.Endpoints {
-				fmt.Fprintf(a.stdout, "    • %s", ep.Name)
+				_, _ = fmt.Fprintf(a.stdout, "    • %s", ep.Name)
 				if !ep.Enabled {
-					fmt.Fprintf(a.stdout, " (disabled)")
+					_, _ = fmt.Fprintf(a.stdout, " (disabled)")
 				}
-				fmt.Fprintln(a.stdout)
+				_, _ = fmt.Fprintln(a.stdout)
 			}
 		}
 		if config.Notification.Batching.Enabled {
-			fmt.Fprintf(a.stdout, "  Batching:\n")
-			fmt.Fprintf(a.stdout, "    Max Size: %d\n", config.Notification.Batching.MaxSize)
-			fmt.Fprintf(a.stdout, "    Max Wait: %s\n", config.Notification.Batching.MaxWait.Duration())
+			_, _ = fmt.Fprintf(a.stdout, "  Batching:\n")
+			_, _ = fmt.Fprintf(a.stdout, "    Max Size: %d\n", config.Notification.Batching.MaxSize)
+			_, _ = fmt.Fprintf(a.stdout, "    Max Wait: %s\n", config.Notification.Batching.MaxWait.Duration())
 		}
 	}
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout)
 }
 
 func (a *App) printVariablesSection(config *api.AgentConfig) {
 	if len(config.Variables) > 0 {
-		fmt.Fprintf(a.stdout, "Variables\n")
-		fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
+		_, _ = fmt.Fprintf(a.stdout, "Variables\n")
+		_, _ = fmt.Fprintf(a.stdout, "───────────────────────────────────────\n")
 		for k, v := range config.Variables {
-			fmt.Fprintf(a.stdout, "  %s: %v\n", k, v)
+			_, _ = fmt.Fprintf(a.stdout, "  %s: %v\n", k, v)
 		}
-		fmt.Fprintln(a.stdout)
+		_, _ = fmt.Fprintln(a.stdout)
 	}
 }

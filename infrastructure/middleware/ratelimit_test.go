@@ -44,11 +44,6 @@ func successHandler(_ context.Context, _ *middleware.ExecutionContext) (tool.Res
 	return tool.Result{Output: json.RawMessage(`{"success": true}`)}, nil
 }
 
-// errorHandler is a handler that always fails.
-func errorHandler(_ context.Context, _ *middleware.ExecutionContext) (tool.Result, error) {
-	return tool.Result{}, errors.New("handler error")
-}
-
 func TestRateLimit(t *testing.T) {
 	t.Run("allows_requests_within_limit", func(t *testing.T) {
 		mw := RateLimit(RateLimitConfig{

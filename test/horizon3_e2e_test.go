@@ -639,9 +639,10 @@ func TestHorizon3_EndToEnd_MultipleProposals(t *testing.T) {
 	applied := 0
 	rejected := 0
 	for _, p := range allProposals {
-		if p.Status == proposal.ProposalStatusApplied {
+		switch p.Status {
+		case proposal.ProposalStatusApplied:
 			applied++
-		} else if p.Status == proposal.ProposalStatusRejected {
+		case proposal.ProposalStatusRejected:
 			rejected++
 		}
 	}

@@ -106,22 +106,22 @@ func (a *App) runAgent(ctx context.Context, opts *runOptions) error {
 	}
 
 	if opts.verbose {
-		fmt.Fprintf(a.stdout, "Configuration loaded: %s v%s\n", config.Name, config.Version)
+		_, _ = fmt.Fprintf(a.stdout, "Configuration loaded: %s v%s\n", config.Name, config.Version)
 		if config.Description != "" {
-			fmt.Fprintf(a.stdout, "Description: %s\n", config.Description)
+			_, _ = fmt.Fprintf(a.stdout, "Description: %s\n", config.Description)
 		}
-		fmt.Fprintf(a.stdout, "Max steps: %d\n", result.MaxSteps)
-		fmt.Fprintf(a.stdout, "Initial state: %s\n", config.Agent.InitialState)
-		fmt.Fprintf(a.stdout, "Tool packs: %d\n", len(result.ToolPacks))
-		fmt.Fprintf(a.stdout, "Inline tools: %d\n", len(result.InlineTools))
-		fmt.Fprintf(a.stdout, "\n")
+		_, _ = fmt.Fprintf(a.stdout, "Max steps: %d\n", result.MaxSteps)
+		_, _ = fmt.Fprintf(a.stdout, "Initial state: %s\n", config.Agent.InitialState)
+		_, _ = fmt.Fprintf(a.stdout, "Tool packs: %d\n", len(result.ToolPacks))
+		_, _ = fmt.Fprintf(a.stdout, "Inline tools: %d\n", len(result.InlineTools))
+		_, _ = fmt.Fprintf(a.stdout, "\n")
 	}
 
 	// If dry-run, stop here
 	if opts.dryRun {
-		fmt.Fprintf(a.stdout, "Configuration validated successfully.\n")
+		_, _ = fmt.Fprintf(a.stdout, "Configuration validated successfully.\n")
 		if opts.goal != "" {
-			fmt.Fprintf(a.stdout, "Goal: %s\n", opts.goal)
+			_, _ = fmt.Fprintf(a.stdout, "Goal: %s\n", opts.goal)
 		}
 		return nil
 	}
@@ -184,9 +184,9 @@ func (a *App) runAgent(ctx context.Context, opts *runOptions) error {
 	}
 
 	if opts.verbose {
-		fmt.Fprintf(a.stdout, "Starting agent run...\n")
-		fmt.Fprintf(a.stdout, "Goal: %s\n", goal)
-		fmt.Fprintf(a.stdout, "\n")
+		_, _ = fmt.Fprintf(a.stdout, "Starting agent run...\n")
+		_, _ = fmt.Fprintf(a.stdout, "Goal: %s\n", goal)
+		_, _ = fmt.Fprintf(a.stdout, "\n")
 	}
 
 	// Execute the run with variables
@@ -220,20 +220,21 @@ func (a *App) runAgent(ctx context.Context, opts *runOptions) error {
 	}
 
 	// Text output
-	fmt.Fprintf(a.stdout, "Run completed\n")
-	fmt.Fprintf(a.stdout, "  Run ID: %s\n", run.ID)
-	fmt.Fprintf(a.stdout, "  State: %s\n", run.CurrentState.String())
-	fmt.Fprintf(a.stdout, "  Duration: %s\n", duration)
+	_, _ = fmt.Fprintf(a.stdout, "Run completed\n")
+	_, _ = fmt.Fprintf(a.stdout, "  Run ID: %s\n", run.ID)
+	_, _ = fmt.Fprintf(a.stdout, "  State: %s\n", run.CurrentState.String())
+	_, _ = fmt.Fprintf(a.stdout, "  Duration: %s\n", duration)
 
-	if run.CurrentState == agent.StateDone {
-		fmt.Fprintf(a.stdout, "  Status: SUCCESS\n")
+	switch run.CurrentState {
+	case agent.StateDone:
+		_, _ = fmt.Fprintf(a.stdout, "  Status: SUCCESS\n")
 		if run.Result != nil {
-			fmt.Fprintf(a.stdout, "  Result: %s\n", formatJSON(run.Result))
+			_, _ = fmt.Fprintf(a.stdout, "  Result: %s\n", formatJSON(run.Result))
 		}
-	} else if run.CurrentState == agent.StateFailed {
-		fmt.Fprintf(a.stdout, "  Status: FAILED\n")
+	case agent.StateFailed:
+		_, _ = fmt.Fprintf(a.stdout, "  Status: FAILED\n")
 		if run.Error != "" {
-			fmt.Fprintf(a.stdout, "  Error: %s\n", run.Error)
+			_, _ = fmt.Fprintf(a.stdout, "  Error: %s\n", run.Error)
 		}
 	}
 

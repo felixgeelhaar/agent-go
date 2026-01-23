@@ -182,7 +182,7 @@ func runExample() error {
 	fmt.Printf("\n--- Evidence Trail ---\n")
 	for i, ev := range run.Evidence {
 		fmt.Printf("%d. [%s] %s\n", i+1, ev.Type, ev.Source)
-		if ev.Content != nil && len(ev.Content) > 0 {
+		if len(ev.Content) > 0 {
 			var content interface{}
 			if err := json.Unmarshal(ev.Content, &content); err == nil {
 				switch v := content.(type) {

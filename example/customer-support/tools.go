@@ -170,12 +170,7 @@ func NewLookupCustomerTool(store *MockDataStore) tool.Tool {
 			// Search by ID first
 			if in.ID != "" {
 				if cust, ok := store.customers[in.ID]; ok {
-					output := LookupCustomerOutput{
-						ID:    cust.ID,
-						Name:  cust.Name,
-						Email: cust.Email,
-						Tier:  cust.Tier,
-					}
+					output := LookupCustomerOutput(cust)
 					outputBytes, _ := json.Marshal(output)
 					return tool.Result{Output: outputBytes}, nil
 				}
@@ -185,12 +180,7 @@ func NewLookupCustomerTool(store *MockDataStore) tool.Tool {
 			if in.Email != "" {
 				for _, cust := range store.customers {
 					if strings.EqualFold(cust.Email, in.Email) {
-						output := LookupCustomerOutput{
-							ID:    cust.ID,
-							Name:  cust.Name,
-							Email: cust.Email,
-							Tier:  cust.Tier,
-						}
+						output := LookupCustomerOutput(cust)
 						outputBytes, _ := json.Marshal(output)
 						return tool.Result{Output: outputBytes}, nil
 					}

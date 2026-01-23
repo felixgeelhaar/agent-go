@@ -511,10 +511,7 @@ func (c *MCPClient) CallTool(ctx context.Context, req MCPToolCall) (*MCPToolResu
 		return nil, ErrNotConnected
 	}
 
-	params := callToolParams{
-		Name:      req.Name,
-		Arguments: req.Arguments,
-	}
+	params := callToolParams(req)
 
 	resp, err := c.sendRequest(ctx, "tools/call", params)
 	if err != nil {

@@ -82,50 +82,50 @@ func (a *App) validateConfig(opts *validateOptions) error {
 		return fmt.Errorf("configuration build failed: %w", err)
 	}
 
-	fmt.Fprintf(a.stdout, "✓ Configuration is valid\n")
-	fmt.Fprintf(a.stdout, "  Name: %s\n", config.Name)
-	fmt.Fprintf(a.stdout, "  Version: %s\n", config.Version)
+	_, _ = fmt.Fprintf(a.stdout, "✓ Configuration is valid\n")
+	_, _ = fmt.Fprintf(a.stdout, "  Name: %s\n", config.Name)
+	_, _ = fmt.Fprintf(a.stdout, "  Version: %s\n", config.Version)
 	if config.Description != "" {
-		fmt.Fprintf(a.stdout, "  Description: %s\n", config.Description)
+		_, _ = fmt.Fprintf(a.stdout, "  Description: %s\n", config.Description)
 	}
 
 	// Summary
-	fmt.Fprintf(a.stdout, "\nConfiguration summary:\n")
-	fmt.Fprintf(a.stdout, "  Max steps: %d\n", config.Agent.MaxSteps)
-	fmt.Fprintf(a.stdout, "  Initial state: %s\n", config.Agent.InitialState)
+	_, _ = fmt.Fprintf(a.stdout, "\nConfiguration summary:\n")
+	_, _ = fmt.Fprintf(a.stdout, "  Max steps: %d\n", config.Agent.MaxSteps)
+	_, _ = fmt.Fprintf(a.stdout, "  Initial state: %s\n", config.Agent.InitialState)
 
 	if len(config.Tools.Packs) > 0 {
-		fmt.Fprintf(a.stdout, "  Tool packs: %d\n", len(config.Tools.Packs))
+		_, _ = fmt.Fprintf(a.stdout, "  Tool packs: %d\n", len(config.Tools.Packs))
 		for _, pack := range config.Tools.Packs {
-			fmt.Fprintf(a.stdout, "    - %s (v%s)\n", pack.Name, pack.Version)
+			_, _ = fmt.Fprintf(a.stdout, "    - %s (v%s)\n", pack.Name, pack.Version)
 		}
 	}
 
 	if len(config.Tools.Inline) > 0 {
-		fmt.Fprintf(a.stdout, "  Inline tools: %d\n", len(config.Tools.Inline))
+		_, _ = fmt.Fprintf(a.stdout, "  Inline tools: %d\n", len(config.Tools.Inline))
 		for _, tool := range config.Tools.Inline {
-			fmt.Fprintf(a.stdout, "    - %s\n", tool.Name)
+			_, _ = fmt.Fprintf(a.stdout, "    - %s\n", tool.Name)
 		}
 	}
 
 	if len(config.Tools.Eligibility) > 0 {
-		fmt.Fprintf(a.stdout, "  Eligibility rules: %d states\n", len(config.Tools.Eligibility))
+		_, _ = fmt.Fprintf(a.stdout, "  Eligibility rules: %d states\n", len(config.Tools.Eligibility))
 	}
 
 	if len(config.Policy.Budgets) > 0 {
-		fmt.Fprintf(a.stdout, "  Budgets:\n")
+		_, _ = fmt.Fprintf(a.stdout, "  Budgets:\n")
 		for name, limit := range config.Policy.Budgets {
-			fmt.Fprintf(a.stdout, "    - %s: %d\n", name, limit)
+			_, _ = fmt.Fprintf(a.stdout, "    - %s: %d\n", name, limit)
 		}
 	}
 
 	if config.Policy.RateLimit.Enabled {
-		fmt.Fprintf(a.stdout, "  Rate limiting: enabled (rate=%d, burst=%d)\n",
+		_, _ = fmt.Fprintf(a.stdout, "  Rate limiting: enabled (rate=%d, burst=%d)\n",
 			config.Policy.RateLimit.Rate, config.Policy.RateLimit.Burst)
 	}
 
 	if config.Notification.Enabled {
-		fmt.Fprintf(a.stdout, "  Notifications: enabled (%d endpoints)\n", len(config.Notification.Endpoints))
+		_, _ = fmt.Fprintf(a.stdout, "  Notifications: enabled (%d endpoints)\n", len(config.Notification.Endpoints))
 	}
 
 	return nil
@@ -138,6 +138,6 @@ func (a *App) showConfigSchema() error {
 		return fmt.Errorf("failed to generate schema: %w", err)
 	}
 
-	fmt.Fprintln(a.stdout, schemaJSON)
+	_, _ = fmt.Fprintln(a.stdout, schemaJSON)
 	return nil
 }

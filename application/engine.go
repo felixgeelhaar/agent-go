@@ -136,10 +136,8 @@ func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]a
 
 	// Create run
 	run := agent.NewRun(runID, goal)
-	if vars != nil {
-		for k, v := range vars {
-			run.SetVar(k, v)
-		}
+	for k, v := range vars {
+		run.SetVar(k, v)
 	}
 
 	// Create supporting components

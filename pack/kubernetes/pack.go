@@ -600,15 +600,6 @@ type execInput struct {
 	Command   []string `json:"command"`
 }
 
-// execOutput is the output for the k8s_exec tool.
-type execOutput struct {
-	Pod       string `json:"pod"`
-	Container string `json:"container,omitempty"`
-	Stdout    string `json:"stdout"`
-	Stderr    string `json:"stderr"`
-	ExitCode  int    `json:"exit_code"`
-}
-
 func execTool(cfg *Config) tool.Tool {
 	return tool.NewBuilder("k8s_exec").
 		WithDescription("Execute a command in a pod").
@@ -630,10 +621,7 @@ func execTool(cfg *Config) tool.Tool {
 				return tool.Result{}, errors.New("REST config is required for exec operations")
 			}
 
-			ns := resolveNamespace(cfg.Namespace, in.Namespace)
-			if ns == "" {
-				ns = "default"
-			}
+			_ = resolveNamespace(cfg.Namespace, in.Namespace)
 
 			// Note: Full exec implementation requires remotecommand package
 			// This is a simplified version that returns an error for now

@@ -145,7 +145,7 @@ func queryTool(cfg *Config) tool.Tool {
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("query failed: %w", err)
 			}
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 
 			// Get column names
 			columns, err := rows.Columns()
@@ -429,7 +429,7 @@ func getPostgresSchema(ctx context.Context, db *sql.DB, table string) ([]columnI
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []columnInfo
 	for rows.Next() {
@@ -464,7 +464,7 @@ func getMySQLSchema(ctx context.Context, db *sql.DB, table string) ([]columnInfo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []columnInfo
 	for rows.Next() {
@@ -489,7 +489,7 @@ func getSQLiteSchema(ctx context.Context, db *sql.DB, table string) ([]columnInf
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []columnInfo
 	for rows.Next() {

@@ -61,7 +61,7 @@ func (a *App) exportSchema(opts *exportSchemaOptions) error {
 
 	if opts.outputPath == "" {
 		// Write to stdout
-		fmt.Fprintln(a.stdout, schemaJSON)
+		_, _ = fmt.Fprintln(a.stdout, schemaJSON)
 		return nil
 	}
 
@@ -70,6 +70,6 @@ func (a *App) exportSchema(opts *exportSchemaOptions) error {
 		return fmt.Errorf("failed to write schema file: %w", err)
 	}
 
-	fmt.Fprintf(a.stdout, "Schema exported to %s\n", opts.outputPath)
+	_, _ = fmt.Fprintf(a.stdout, "Schema exported to %s\n", opts.outputPath)
 	return nil
 }

@@ -36,7 +36,7 @@ type (
 	// LegacyMiddlewareCache provides in-memory caching for tool results.
 	//
 	// Deprecated: Use Cache interface with NewMemoryCache instead.
-	LegacyMiddlewareCache = inframw.LegacyCache
+	LegacyMiddlewareCache = inframw.LegacyCache //nolint:staticcheck // intentional backward compatibility
 )
 
 // NewMiddlewareRegistry creates a new middleware registry.

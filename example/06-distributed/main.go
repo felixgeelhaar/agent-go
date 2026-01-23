@@ -16,6 +16,11 @@ import (
 	"github.com/felixgeelhaar/agent-go/infrastructure/distributed/queue"
 )
 
+// contextKey is a custom type for context keys to avoid collisions.
+type contextKey string
+
+const workerIDKey contextKey = "worker_id"
+
 func main() {
 	fmt.Println("=== Distributed Execution Example ===")
 	fmt.Println()
@@ -103,7 +108,7 @@ func main() {
 		// Register custom handler for our task type
 		workers[i].RegisterHandler(queue.TaskTypeToolCall, func(ctx context.Context, task queue.Task) (json.RawMessage, error) {
 			// Add worker ID to context
-			ctx = context.WithValue(ctx, "worker_id", task.Metadata["worker_id"])
+			ctx = context.WithValue(ctx, workerIDKey, task.Metadata["worker_id"])
 
 			var payload queue.ToolCallPayload
 			if err := json.Unmarshal(task.Payload, &payload); err != nil {

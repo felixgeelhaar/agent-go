@@ -869,8 +869,7 @@ func TestMCPToolResult(t *testing.T) {
 		}
 
 		// With omitempty, isError should not appear when false
-		if string(data) == `{"content":[{"type":"text","text":"Success"}],"isError":false}` {
-			// This is also acceptable if omitempty doesn't apply
-		}
+		// Both formats are acceptable depending on omitempty behavior
+		_ = string(data) // Validate JSON was generated without error
 	})
 }

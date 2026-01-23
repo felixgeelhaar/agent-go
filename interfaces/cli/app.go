@@ -88,9 +88,9 @@ func (a *App) newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintf(a.stdout, "agent-go version %s\n", Version)
-			fmt.Fprintf(a.stdout, "  Git commit: %s\n", GitCommit)
-			fmt.Fprintf(a.stdout, "  Build date: %s\n", BuildDate)
+			_, _ = fmt.Fprintf(a.stdout, "agent-go version %s\n", Version)
+			_, _ = fmt.Fprintf(a.stdout, "  Git commit: %s\n", GitCommit)
+			_, _ = fmt.Fprintf(a.stdout, "  Build date: %s\n", BuildDate)
 		},
 	}
 }

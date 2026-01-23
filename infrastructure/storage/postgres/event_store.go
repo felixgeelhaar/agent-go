@@ -52,7 +52,7 @@ func (s *EventStore) Append(ctx context.Context, events ...event.Event) error {
 	if err != nil {
 		return s.wrapError(err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Get current max sequence for each run
 	sequences := make(map[string]uint64)

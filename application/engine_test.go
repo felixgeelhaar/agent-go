@@ -185,7 +185,7 @@ func TestRun_FullLifecycle_Failure(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	run, err := engine.Run(ctx, "test failure lifecycle")
+	run, _ := engine.Run(ctx, "test failure lifecycle")
 
 	// Run should complete (return the run object) but with failed status
 	if run == nil {

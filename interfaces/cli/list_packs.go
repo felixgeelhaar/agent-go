@@ -55,68 +55,68 @@ func (a *App) listPacks(opts *listPacksOptions) error {
 	}
 
 	if len(config.Tools.Packs) == 0 && len(config.Tools.Inline) == 0 {
-		fmt.Fprintf(a.stdout, "No tool packs or inline tools configured.\n")
+		_, _ = fmt.Fprintf(a.stdout, "No tool packs or inline tools configured.\n")
 		return nil
 	}
 
 	// Tool packs
 	if len(config.Tools.Packs) > 0 {
-		fmt.Fprintf(a.stdout, "Tool Packs (%d):\n", len(config.Tools.Packs))
+		_, _ = fmt.Fprintf(a.stdout, "Tool Packs (%d):\n", len(config.Tools.Packs))
 		for _, pack := range config.Tools.Packs {
-			fmt.Fprintf(a.stdout, "\n  %s", pack.Name)
+			_, _ = fmt.Fprintf(a.stdout, "\n  %s", pack.Name)
 			if pack.Version != "" {
-				fmt.Fprintf(a.stdout, " (v%s)", pack.Version)
+				_, _ = fmt.Fprintf(a.stdout, " (v%s)", pack.Version)
 			}
-			fmt.Fprintf(a.stdout, "\n")
+			_, _ = fmt.Fprintf(a.stdout, "\n")
 
 			if opts.verbose {
 				if len(pack.Config) > 0 {
-					fmt.Fprintf(a.stdout, "    Configuration:\n")
+					_, _ = fmt.Fprintf(a.stdout, "    Configuration:\n")
 					for k, v := range pack.Config {
-						fmt.Fprintf(a.stdout, "      %s: %v\n", k, v)
+						_, _ = fmt.Fprintf(a.stdout, "      %s: %v\n", k, v)
 					}
 				}
 			}
 
 			if len(pack.Enabled) > 0 {
-				fmt.Fprintf(a.stdout, "    Enabled tools: %v\n", pack.Enabled)
+				_, _ = fmt.Fprintf(a.stdout, "    Enabled tools: %v\n", pack.Enabled)
 			}
 			if len(pack.Disabled) > 0 {
-				fmt.Fprintf(a.stdout, "    Disabled tools: %v\n", pack.Disabled)
+				_, _ = fmt.Fprintf(a.stdout, "    Disabled tools: %v\n", pack.Disabled)
 			}
 		}
 	}
 
 	// Inline tools
 	if len(config.Tools.Inline) > 0 {
-		fmt.Fprintf(a.stdout, "\nInline Tools (%d):\n", len(config.Tools.Inline))
+		_, _ = fmt.Fprintf(a.stdout, "\nInline Tools (%d):\n", len(config.Tools.Inline))
 		for _, tool := range config.Tools.Inline {
-			fmt.Fprintf(a.stdout, "\n  %s\n", tool.Name)
+			_, _ = fmt.Fprintf(a.stdout, "\n  %s\n", tool.Name)
 			if tool.Description != "" {
-				fmt.Fprintf(a.stdout, "    Description: %s\n", tool.Description)
+				_, _ = fmt.Fprintf(a.stdout, "    Description: %s\n", tool.Description)
 			}
 
 			if opts.verbose {
-				fmt.Fprintf(a.stdout, "    Handler: %s\n", tool.Handler.Type)
+				_, _ = fmt.Fprintf(a.stdout, "    Handler: %s\n", tool.Handler.Type)
 				if tool.Handler.Command != "" {
-					fmt.Fprintf(a.stdout, "    Command: %s\n", tool.Handler.Command)
+					_, _ = fmt.Fprintf(a.stdout, "    Command: %s\n", tool.Handler.Command)
 				}
 				if len(tool.Handler.Args) > 0 {
-					fmt.Fprintf(a.stdout, "    Args: %v\n", tool.Handler.Args)
+					_, _ = fmt.Fprintf(a.stdout, "    Args: %v\n", tool.Handler.Args)
 				}
 
 				// Annotations
 				if tool.Annotations.ReadOnly {
-					fmt.Fprintf(a.stdout, "    ReadOnly: true\n")
+					_, _ = fmt.Fprintf(a.stdout, "    ReadOnly: true\n")
 				}
 				if tool.Annotations.Destructive {
-					fmt.Fprintf(a.stdout, "    Destructive: true\n")
+					_, _ = fmt.Fprintf(a.stdout, "    Destructive: true\n")
 				}
 				if tool.Annotations.Idempotent {
-					fmt.Fprintf(a.stdout, "    Idempotent: true\n")
+					_, _ = fmt.Fprintf(a.stdout, "    Idempotent: true\n")
 				}
 				if tool.Annotations.RiskLevel != "" {
-					fmt.Fprintf(a.stdout, "    Risk Level: %s\n", tool.Annotations.RiskLevel)
+					_, _ = fmt.Fprintf(a.stdout, "    Risk Level: %s\n", tool.Annotations.RiskLevel)
 				}
 			}
 		}
@@ -124,9 +124,9 @@ func (a *App) listPacks(opts *listPacksOptions) error {
 
 	// Eligibility summary
 	if len(config.Tools.Eligibility) > 0 {
-		fmt.Fprintf(a.stdout, "\nTool Eligibility by State:\n")
+		_, _ = fmt.Fprintf(a.stdout, "\nTool Eligibility by State:\n")
 		for state, tools := range config.Tools.Eligibility {
-			fmt.Fprintf(a.stdout, "  %s: %v\n", state, tools)
+			_, _ = fmt.Fprintf(a.stdout, "  %s: %v\n", state, tools)
 		}
 	}
 
