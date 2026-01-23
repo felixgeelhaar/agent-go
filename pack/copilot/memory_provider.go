@@ -18,6 +18,8 @@ type MemoryProvider struct {
 	SuggestFixFunc    func(ctx context.Context, req SuggestFixRequest) (SuggestFixResponse, error)
 	GenerateTestsFunc func(ctx context.Context, req GenerateTestsRequest) (GenerateTestsResponse, error)
 	RefactorFunc      func(ctx context.Context, req RefactorRequest) (RefactorResponse, error)
+	ReviewPRFunc      func(ctx context.Context, req ReviewPRRequest) (ReviewPRResponse, error)
+	AnalyzeIssueFunc  func(ctx context.Context, req AnalyzeIssueRequest) (AnalyzeIssueResponse, error)
 }
 
 // NewMemoryProvider creates a new in-memory Copilot provider with sensible defaults.
@@ -195,5 +197,85 @@ func (p *MemoryProvider) Refactor(ctx context.Context, req RefactorRequest) (Ref
 		},
 		Improvements: fmt.Sprintf("The refactored code improves %s by "+
 			"reducing complexity and enhancing maintainability.", req.Goal),
+	}, nil
+}
+
+// ReviewPR reviews a pull request.
+func (p *MemoryProvider) ReviewPR(ctx context.Context, req ReviewPRRequest) (ReviewPRResponse, error) {
+	if p.ReviewPRFunc != nil {
+		return p.ReviewPRFunc(ctx, req)
+	}
+
+	// Default mock implementation
+	comments := []PRComment{}
+
+	// Generate mock comments based on diff content
+	if strings.Contains(req.Diff, "TODO") {
+		comments = append(comments, PRComment{
+			File:     "unknown",
+			Body:     "Found TODO comment that should be addressed before merging",
+			Severity: "warning",
+		})
+	}
+
+	if strings.Contains(req.Diff, "password") || strings.Contains(req.Diff, "secret") {
+		comments = append(comments, PRComment{
+			File:     "unknown",
+			Body:     "Potential sensitive data detected - ensure proper handling",
+			Severity: "error",
+		})
+	}
+
+	verdict := "approve"
+	riskLevel := "low"
+	if len(comments) > 0 {
+		verdict = "comment"
+		riskLevel = "medium"
+	}
+
+	return ReviewPRResponse{
+		Summary:   fmt.Sprintf("PR Review: %s\n\nThis PR contains changes that have been reviewed for quality and security.", req.Title),
+		Comments:  comments,
+		Verdict:   verdict,
+		RiskLevel: riskLevel,
+	}, nil
+}
+
+// AnalyzeIssue analyzes a GitHub issue.
+func (p *MemoryProvider) AnalyzeIssue(ctx context.Context, req AnalyzeIssueRequest) (AnalyzeIssueResponse, error) {
+	if p.AnalyzeIssueFunc != nil {
+		return p.AnalyzeIssueFunc(ctx, req)
+	}
+
+	// Default mock implementation - categorize based on title/body content
+	category := "feature"
+	priority := "medium"
+	effort := "medium"
+
+	titleLower := strings.ToLower(req.Title)
+	bodyLower := strings.ToLower(req.Body)
+
+	if strings.Contains(titleLower, "bug") || strings.Contains(titleLower, "error") ||
+		strings.Contains(titleLower, "fix") || strings.Contains(titleLower, "crash") {
+		category = "bug"
+		priority = "high"
+		effort = "small"
+	} else if strings.Contains(titleLower, "question") || strings.Contains(bodyLower, "how do") {
+		category = "question"
+		priority = "low"
+		effort = "trivial"
+	} else if strings.Contains(titleLower, "doc") || strings.Contains(titleLower, "readme") {
+		category = "documentation"
+		priority = "low"
+		effort = "small"
+	}
+
+	return AnalyzeIssueResponse{
+		Summary:           fmt.Sprintf("Issue Analysis: %s\n\nThis issue has been analyzed and categorized.", req.Title),
+		Category:          category,
+		Priority:          priority,
+		SuggestedSolution: "Investigate the reported issue and implement appropriate changes.",
+		RelatedAreas:      []string{"core", "api"},
+		EstimatedEffort:   effort,
 	}, nil
 }

@@ -501,3 +501,305 @@ func TestGenerateTestsTool(t *testing.T) {
 		t.Error("Tests is empty")
 	}
 }
+
+func TestReviewPRTool(t *testing.T) {
+	t.Parallel()
+
+	provider := NewMemoryProvider()
+	pack, _ := New(provider, WithPRReview())
+
+	tool, ok := pack.GetTool("copilot_review_pr")
+	if !ok {
+		t.Fatal("copilot_review_pr tool not found")
+	}
+
+	t.Run("valid input", func(t *testing.T) {
+		t.Parallel()
+
+		input, _ := json.Marshal(ReviewPRRequest{
+			Diff:  "+func Add(a, b int) int { return a + b }",
+			Title: "Add addition function",
+		})
+
+		result, err := tool.Execute(context.Background(), input)
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+
+		var resp ReviewPRResponse
+		if err := json.Unmarshal(result.Output, &resp); err != nil {
+			t.Fatalf("Unmarshal response error = %v", err)
+		}
+
+		if resp.Summary == "" {
+			t.Error("Summary is empty")
+		}
+		if resp.Verdict == "" {
+			t.Error("Verdict is empty")
+		}
+	})
+
+	t.Run("missing diff", func(t *testing.T) {
+		t.Parallel()
+
+		input, _ := json.Marshal(ReviewPRRequest{
+			Title: "Some PR",
+		})
+
+		_, err := tool.Execute(context.Background(), input)
+		if err == nil {
+			t.Error("Execute() expected error for missing diff")
+		}
+	})
+}
+
+func TestAnalyzeIssueTool(t *testing.T) {
+	t.Parallel()
+
+	provider := NewMemoryProvider()
+	pack, _ := New(provider, WithIssueAnalysis())
+
+	tool, ok := pack.GetTool("copilot_analyze_issue")
+	if !ok {
+		t.Fatal("copilot_analyze_issue tool not found")
+	}
+
+	t.Run("valid input", func(t *testing.T) {
+		t.Parallel()
+
+		input, _ := json.Marshal(AnalyzeIssueRequest{
+			Title: "Bug: Application crashes on startup",
+			Body:  "When I run the app, it immediately crashes with a nil pointer error.",
+		})
+
+		result, err := tool.Execute(context.Background(), input)
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+
+		var resp AnalyzeIssueResponse
+		if err := json.Unmarshal(result.Output, &resp); err != nil {
+			t.Fatalf("Unmarshal response error = %v", err)
+		}
+
+		if resp.Summary == "" {
+			t.Error("Summary is empty")
+		}
+		if resp.Category == "" {
+			t.Error("Category is empty")
+		}
+		if resp.Priority == "" {
+			t.Error("Priority is empty")
+		}
+	})
+
+	t.Run("missing title", func(t *testing.T) {
+		t.Parallel()
+
+		input, _ := json.Marshal(AnalyzeIssueRequest{
+			Body: "Some body",
+		})
+
+		_, err := tool.Execute(context.Background(), input)
+		if err == nil {
+			t.Error("Execute() expected error for missing title")
+		}
+	})
+
+	t.Run("missing body", func(t *testing.T) {
+		t.Parallel()
+
+		input, _ := json.Marshal(AnalyzeIssueRequest{
+			Title: "Some title",
+		})
+
+		_, err := tool.Execute(context.Background(), input)
+		if err == nil {
+			t.Error("Execute() expected error for missing body")
+		}
+	})
+}
+
+func TestMemoryProvider_ReviewPR(t *testing.T) {
+	t.Parallel()
+
+	provider := NewMemoryProvider()
+
+	t.Run("clean PR", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.ReviewPR(context.Background(), ReviewPRRequest{
+			Diff:  "+func Add(a, b int) int { return a + b }",
+			Title: "Add function",
+		})
+		if err != nil {
+			t.Fatalf("ReviewPR() error = %v", err)
+		}
+
+		if resp.Verdict != "approve" {
+			t.Errorf("Verdict = %s, want approve", resp.Verdict)
+		}
+		if resp.RiskLevel != "low" {
+			t.Errorf("RiskLevel = %s, want low", resp.RiskLevel)
+		}
+	})
+
+	t.Run("PR with TODO", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.ReviewPR(context.Background(), ReviewPRRequest{
+			Diff:  "+// TODO: implement this\n+func Add(a, b int) int { return 0 }",
+			Title: "WIP: Add function",
+		})
+		if err != nil {
+			t.Fatalf("ReviewPR() error = %v", err)
+		}
+
+		if len(resp.Comments) == 0 {
+			t.Error("Expected comments for TODO")
+		}
+		if resp.Verdict != "comment" {
+			t.Errorf("Verdict = %s, want comment", resp.Verdict)
+		}
+	})
+
+	t.Run("PR with security issue", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.ReviewPR(context.Background(), ReviewPRRequest{
+			Diff:  "+password := \"hardcoded\"",
+			Title: "Add auth",
+		})
+		if err != nil {
+			t.Fatalf("ReviewPR() error = %v", err)
+		}
+
+		if len(resp.Comments) == 0 {
+			t.Error("Expected comments for password")
+		}
+	})
+}
+
+func TestMemoryProvider_AnalyzeIssue(t *testing.T) {
+	t.Parallel()
+
+	provider := NewMemoryProvider()
+
+	t.Run("bug issue", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.AnalyzeIssue(context.Background(), AnalyzeIssueRequest{
+			Title: "Bug: crashes on startup",
+			Body:  "The app crashes immediately",
+		})
+		if err != nil {
+			t.Fatalf("AnalyzeIssue() error = %v", err)
+		}
+
+		if resp.Category != "bug" {
+			t.Errorf("Category = %s, want bug", resp.Category)
+		}
+		if resp.Priority != "high" {
+			t.Errorf("Priority = %s, want high", resp.Priority)
+		}
+	})
+
+	t.Run("question issue", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.AnalyzeIssue(context.Background(), AnalyzeIssueRequest{
+			Title: "Question: how to use this?",
+			Body:  "How do I configure the settings?",
+		})
+		if err != nil {
+			t.Fatalf("AnalyzeIssue() error = %v", err)
+		}
+
+		if resp.Category != "question" {
+			t.Errorf("Category = %s, want question", resp.Category)
+		}
+		if resp.Priority != "low" {
+			t.Errorf("Priority = %s, want low", resp.Priority)
+		}
+	})
+
+	t.Run("documentation issue", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.AnalyzeIssue(context.Background(), AnalyzeIssueRequest{
+			Title: "Update README docs",
+			Body:  "The readme is outdated",
+		})
+		if err != nil {
+			t.Fatalf("AnalyzeIssue() error = %v", err)
+		}
+
+		if resp.Category != "documentation" {
+			t.Errorf("Category = %s, want documentation", resp.Category)
+		}
+	})
+
+	t.Run("feature issue", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := provider.AnalyzeIssue(context.Background(), AnalyzeIssueRequest{
+			Title: "Add export functionality",
+			Body:  "It would be nice to export data to CSV",
+		})
+		if err != nil {
+			t.Fatalf("AnalyzeIssue() error = %v", err)
+		}
+
+		if resp.Category != "feature" {
+			t.Errorf("Category = %s, want feature", resp.Category)
+		}
+	})
+}
+
+func TestNew_WithGitHubTools(t *testing.T) {
+	t.Parallel()
+
+	provider := NewMemoryProvider()
+
+	t.Run("with PR review", func(t *testing.T) {
+		t.Parallel()
+
+		pack, err := New(provider, WithPRReview())
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+
+		if _, ok := pack.GetTool("copilot_review_pr"); !ok {
+			t.Error("copilot_review_pr tool not found")
+		}
+	})
+
+	t.Run("with issue analysis", func(t *testing.T) {
+		t.Parallel()
+
+		pack, err := New(provider, WithIssueAnalysis())
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+
+		if _, ok := pack.GetTool("copilot_analyze_issue"); !ok {
+			t.Error("copilot_analyze_issue tool not found")
+		}
+	})
+
+	t.Run("with all GitHub tools", func(t *testing.T) {
+		t.Parallel()
+
+		pack, err := New(provider, WithPRReview(), WithIssueAnalysis())
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+
+		if _, ok := pack.GetTool("copilot_review_pr"); !ok {
+			t.Error("copilot_review_pr tool not found")
+		}
+		if _, ok := pack.GetTool("copilot_analyze_issue"); !ok {
+			t.Error("copilot_analyze_issue tool not found")
+		}
+	})
+}

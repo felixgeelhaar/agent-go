@@ -28,6 +28,12 @@ type Provider interface {
 
 	// Refactor suggests refactoring improvements for code.
 	Refactor(ctx context.Context, req RefactorRequest) (RefactorResponse, error)
+
+	// ReviewPR analyzes a pull request for issues and provides feedback.
+	ReviewPR(ctx context.Context, req ReviewPRRequest) (ReviewPRResponse, error)
+
+	// AnalyzeIssue analyzes a GitHub issue and suggests solutions.
+	AnalyzeIssue(ctx context.Context, req AnalyzeIssueRequest) (AnalyzeIssueResponse, error)
 }
 
 // CompleteRequest is the input for code completion.
@@ -162,4 +168,70 @@ type RefactorResponse struct {
 	Changes []string `json:"changes,omitempty"`
 	// Improvements describes the benefits of the refactoring.
 	Improvements string `json:"improvements,omitempty"`
+}
+
+// ReviewPRRequest is the input for PR review.
+type ReviewPRRequest struct {
+	// Diff is the PR diff content.
+	Diff string `json:"diff"`
+	// Title is the PR title.
+	Title string `json:"title,omitempty"`
+	// Description is the PR description.
+	Description string `json:"description,omitempty"`
+	// Files lists the files changed in the PR.
+	Files []string `json:"files,omitempty"`
+	// Focus specifies review focus ("security", "performance", "correctness", "all").
+	Focus string `json:"focus,omitempty"`
+}
+
+// ReviewPRResponse is the output of PR review.
+type ReviewPRResponse struct {
+	// Summary is an overall summary of the PR.
+	Summary string `json:"summary"`
+	// Comments lists specific comments on the changes.
+	Comments []PRComment `json:"comments"`
+	// Verdict is the review verdict ("approve", "request_changes", "comment").
+	Verdict string `json:"verdict"`
+	// RiskLevel indicates the risk of merging ("low", "medium", "high").
+	RiskLevel string `json:"risk_level,omitempty"`
+}
+
+// PRComment represents a comment on a specific part of the PR.
+type PRComment struct {
+	// File is the file path.
+	File string `json:"file"`
+	// Line is the line number.
+	Line int `json:"line,omitempty"`
+	// Body is the comment content.
+	Body string `json:"body"`
+	// Severity indicates comment severity ("info", "warning", "error").
+	Severity string `json:"severity,omitempty"`
+}
+
+// AnalyzeIssueRequest is the input for issue analysis.
+type AnalyzeIssueRequest struct {
+	// Title is the issue title.
+	Title string `json:"title"`
+	// Body is the issue body/description.
+	Body string `json:"body"`
+	// Labels are the issue labels.
+	Labels []string `json:"labels,omitempty"`
+	// Comments are existing comments on the issue.
+	Comments []string `json:"comments,omitempty"`
+}
+
+// AnalyzeIssueResponse is the output of issue analysis.
+type AnalyzeIssueResponse struct {
+	// Summary is a summary of the issue.
+	Summary string `json:"summary"`
+	// Category is the issue category ("bug", "feature", "question", "documentation").
+	Category string `json:"category"`
+	// Priority suggests issue priority ("low", "medium", "high", "critical").
+	Priority string `json:"priority"`
+	// SuggestedSolution describes a potential solution.
+	SuggestedSolution string `json:"suggested_solution,omitempty"`
+	// RelatedAreas lists related code areas to investigate.
+	RelatedAreas []string `json:"related_areas,omitempty"`
+	// EstimatedEffort estimates the effort required ("trivial", "small", "medium", "large").
+	EstimatedEffort string `json:"estimated_effort,omitempty"`
 }

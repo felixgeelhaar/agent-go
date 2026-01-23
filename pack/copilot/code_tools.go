@@ -24,6 +24,12 @@ type Config struct {
 	// EnableRefactor enables the refactoring tool.
 	EnableRefactor bool
 
+	// EnablePRReview enables the PR review tool.
+	EnablePRReview bool
+
+	// EnableIssueAnalysis enables the issue analysis tool.
+	EnableIssueAnalysis bool
+
 	// DefaultLanguage is used when language is not specified.
 	DefaultLanguage string
 }

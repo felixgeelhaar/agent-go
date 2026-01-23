@@ -32,6 +32,20 @@ func WithRefactor() Option {
 	}
 }
 
+// WithPRReview enables the PR review tool.
+func WithPRReview() Option {
+	return func(c *Config) {
+		c.EnablePRReview = true
+	}
+}
+
+// WithIssueAnalysis enables the issue analysis tool.
+func WithIssueAnalysis() Option {
+	return func(c *Config) {
+		c.EnableIssueAnalysis = true
+	}
+}
+
 // WithDefaultLanguage sets the default programming language.
 func WithDefaultLanguage(lang string) Option {
 	return func(c *Config) {
@@ -86,12 +100,29 @@ func New(provider Provider, opts ...Option) (*pack.Pack, error) {
 		coreTools = append(coreTools, "copilot_refactor")
 	}
 
+	// GitHub tools
+	if cfg.EnablePRReview {
+		builder = builder.AddTools(reviewPRTool(&cfg))
+		coreTools = append(coreTools, "copilot_review_pr")
+	}
+
+	if cfg.EnableIssueAnalysis {
+		builder = builder.AddTools(analyzeIssueTool(&cfg))
+		coreTools = append(coreTools, "copilot_analyze_issue")
+	}
+
 	// All tools are read-only, so they can be used in explore state
 	builder = builder.AllowInState(agent.StateExplore, coreTools...)
 
-	// Review tool is also useful in decide state for making decisions
+	// Review tools are also useful in decide state for making decisions
 	if cfg.EnableReview {
 		builder = builder.AllowInState(agent.StateDecide, "copilot_review")
+	}
+	if cfg.EnablePRReview {
+		builder = builder.AllowInState(agent.StateDecide, "copilot_review_pr")
+	}
+	if cfg.EnableIssueAnalysis {
+		builder = builder.AllowInState(agent.StateDecide, "copilot_analyze_issue")
 	}
 
 	// Explain is useful for validation
