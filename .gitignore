@@ -32,6 +32,8 @@ Thumbs.db
 # Build
 /bin/
 /dist/
+/agent
 .relicta/
+.roady/
 .playwright-mcp/
 .env
