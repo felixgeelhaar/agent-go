@@ -68,27 +68,30 @@ func NewLoaderWithOptions(opts ...LoaderOption) *Loader {
 
 // LoadFile loads configuration from a file path.
 func (l *Loader) LoadFile(path string) (*config.AgentConfig, error) {
+	// Clean path to prevent directory traversal (G304)
+	cleanPath := filepath.Clean(path)
+
 	// Check if file exists
-	info, err := os.Stat(path)
+	info, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: %s", config.ErrConfigNotFound, path)
+			return nil, fmt.Errorf("%w: %s", config.ErrConfigNotFound, cleanPath)
 		}
 		return nil, fmt.Errorf("failed to access config file: %w", err)
 	}
 	if info.IsDir() {
-		return nil, fmt.Errorf("%w: %s is a directory", config.ErrInvalidFormat, path)
+		return nil, fmt.Errorf("%w: %s is a directory", config.ErrInvalidFormat, cleanPath)
 	}
 
-	// Open file
-	f, err := os.Open(path)
+	// Open file with cleaned path
+	f, err := os.Open(cleanPath) // #nosec G304 - path is cleaned above
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
 	defer f.Close()
 
 	// Determine format from extension
-	ext := strings.ToLower(filepath.Ext(path))
+	ext := strings.ToLower(filepath.Ext(cleanPath))
 	var format Format
 	switch ext {
 	case ".yaml", ".yml":

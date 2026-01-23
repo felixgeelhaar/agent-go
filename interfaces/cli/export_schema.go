@@ -65,8 +65,8 @@ func (a *App) exportSchema(opts *exportSchemaOptions) error {
 		return nil
 	}
 
-	// Write to file
-	if err := os.WriteFile(opts.outputPath, []byte(schemaJSON), 0644); err != nil {
+	// Write to file with restrictive permissions (G306)
+	if err := os.WriteFile(opts.outputPath, []byte(schemaJSON), 0600); err != nil {
 		return fmt.Errorf("failed to write schema file: %w", err)
 	}
 
