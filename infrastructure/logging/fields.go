@@ -155,3 +155,31 @@ func Str(key, value string) Field {
 		return e.Str(key, value)
 	}
 }
+
+// Int adds an integer field with custom key.
+func Int(key string, value int) Field {
+	return func(e *bolt.Event) *bolt.Event {
+		return e.Int(key, value)
+	}
+}
+
+// Int64 adds an int64 field with custom key.
+func Int64(key string, value int64) Field {
+	return func(e *bolt.Event) *bolt.Event {
+		return e.Int64(key, value)
+	}
+}
+
+// Float64 adds a float64 field with custom key.
+func Float64(key string, value float64) Field {
+	return func(e *bolt.Event) *bolt.Event {
+		return e.Float64(key, value)
+	}
+}
+
+// Bool adds a boolean field with custom key.
+func Bool(key string, value bool) Field {
+	return func(e *bolt.Event) *bolt.Event {
+		return e.Bool(key, value)
+	}
+}

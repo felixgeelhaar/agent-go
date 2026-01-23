@@ -97,6 +97,7 @@ import (
 	"github.com/felixgeelhaar/agent-go/domain/middleware"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
+	inframw "github.com/felixgeelhaar/agent-go/infrastructure/middleware"
 	"github.com/felixgeelhaar/agent-go/infrastructure/planner"
 	"github.com/felixgeelhaar/agent-go/infrastructure/resilience"
 	"github.com/felixgeelhaar/agent-go/infrastructure/storage/memory"
@@ -397,4 +398,69 @@ func WithMiddleware(middlewares ...middleware.Middleware) Option {
 		}
 		c.middleware.UseMany(middlewares...)
 	}
+}
+
+// WithRateLimit enables rate limiting for tool executions.
+// This uses fortify's token bucket rate limiter to control request rates.
+//
+// Parameters:
+//   - rate: Number of tokens added per second
+//   - burst: Maximum tokens (bucket capacity) for handling bursts
+//
+// Example:
+//
+//	engine, _ := api.New(
+//	    api.WithPlanner(planner),
+//	    api.WithRateLimit(100, 100), // 100 requests/sec, burst of 100
+//	)
+func WithRateLimit(rate, burst int) Option {
+	return func(c *engineConfig) {
+		if c.middleware == nil {
+			c.middleware = middleware.NewRegistry()
+		}
+		c.middleware.Use(inframw.RateLimit(inframw.RateLimitConfig{
+			Rate:  rate,
+			Burst: burst,
+		}))
+	}
+}
+
+// WithPerToolRateLimit enables per-tool rate limiting.
+// Each tool can have its own rate limit, falling back to defaults.
+//
+// Example:
+//
+//	engine, _ := api.New(
+//	    api.WithPlanner(planner),
+//	    api.WithPerToolRateLimit(10, 10, map[string]api.ToolRateConfig{
+//	        "fast_tool": {Rate: 100, Burst: 100},
+//	        "slow_tool": {Rate: 5, Burst: 5},
+//	    }),
+//	)
+func WithPerToolRateLimit(defaultRate, defaultBurst int, toolRates map[string]ToolRateConfig) Option {
+	return func(c *engineConfig) {
+		if c.middleware == nil {
+			c.middleware = middleware.NewRegistry()
+		}
+		rates := make(map[string]inframw.RateLimitConfig)
+		for name, cfg := range toolRates {
+			rates[name] = inframw.RateLimitConfig{
+				Rate:  cfg.Rate,
+				Burst: cfg.Burst,
+			}
+		}
+		c.middleware.Use(inframw.PerToolRateLimit(inframw.PerToolRateLimitConfig{
+			DefaultRate:  defaultRate,
+			DefaultBurst: defaultBurst,
+			ToolRates:    rates,
+		}))
+	}
+}
+
+// ToolRateConfig configures rate limits for a specific tool.
+type ToolRateConfig struct {
+	// Rate is the number of tokens added per second.
+	Rate int
+	// Burst is the maximum tokens (bucket capacity).
+	Burst int
 }

@@ -23,4 +23,7 @@ var (
 
 	// ErrToolNotEligible indicates the tool is not eligible in the current state.
 	ErrToolNotEligible = errors.New("tool not eligible in current state")
+
+	// ErrRateLimitExceeded indicates the rate limit has been exceeded.
+	ErrRateLimitExceeded = errors.New("rate limit exceeded")
 )

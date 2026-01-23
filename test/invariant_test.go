@@ -2,14 +2,25 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/felixgeelhaar/agent-go/application"
 	"github.com/felixgeelhaar/agent-go/domain/agent"
+	"github.com/felixgeelhaar/agent-go/domain/artifact"
+	"github.com/felixgeelhaar/agent-go/domain/cache"
+	"github.com/felixgeelhaar/agent-go/domain/event"
+	"github.com/felixgeelhaar/agent-go/domain/ledger"
 	"github.com/felixgeelhaar/agent-go/domain/policy"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
+	"github.com/felixgeelhaar/agent-go/infrastructure/storage/filesystem"
+	"github.com/felixgeelhaar/agent-go/infrastructure/storage/memory"
 	api "github.com/felixgeelhaar/agent-go/interfaces/api"
 )
 
@@ -707,6 +718,977 @@ func TestInvariant_EvidenceAccumulation(t *testing.T) {
 		// Second evidence should have timestamp >= first
 		if run.Evidence[1].Timestamp.Before(run.Evidence[0].Timestamp) {
 			t.Error("evidence timestamps should be sequential")
+		}
+	})
+}
+
+// =============================================================================
+// Invariant 9: Cache Correctness
+// Cache produces deterministic results and respects TTL/eviction policies.
+// =============================================================================
+
+func TestInvariant_CacheCorrectness(t *testing.T) {
+	t.Run("cache_produces_deterministic_results", func(t *testing.T) {
+		c := memory.NewCache()
+		ctx := context.Background()
+
+		key := "test-key"
+		value := []byte(`{"result": "cached value"}`)
+
+		// First set
+		err := c.Set(ctx, key, value, cache.SetOptions{})
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+
+		// Multiple gets should return identical values
+		for i := 0; i < 10; i++ {
+			got, found, err := c.Get(ctx, key)
+			if err != nil {
+				t.Fatalf("Get %d failed: %v", i, err)
+			}
+			if !found {
+				t.Fatalf("Get %d: expected to find cached value", i)
+			}
+			if !bytes.Equal(got, value) {
+				t.Errorf("Get %d: expected %s, got %s", i, value, got)
+			}
+		}
+	})
+
+	t.Run("cache_ttl_expiration", func(t *testing.T) {
+		c := memory.NewCache()
+		ctx := context.Background()
+
+		key := "expiring-key"
+		value := []byte(`{"data": "temporary"}`)
+
+		// Set with short TTL
+		err := c.Set(ctx, key, value, cache.SetOptions{TTL: 50 * time.Millisecond})
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+
+		// Should find immediately
+		_, found, _ := c.Get(ctx, key)
+		if !found {
+			t.Error("expected to find value immediately after set")
+		}
+
+		// Wait for TTL to expire
+		time.Sleep(100 * time.Millisecond)
+
+		// Should not find after expiration
+		_, found, _ = c.Get(ctx, key)
+		if found {
+			t.Error("expected value to be expired")
+		}
+	})
+
+	t.Run("cache_lru_eviction_preserves_recent", func(t *testing.T) {
+		// Create cache with small max size
+		c := memory.NewCache(memory.WithMaxSize(3))
+		ctx := context.Background()
+
+		// Fill cache
+		_ = c.Set(ctx, "key1", []byte("value1"), cache.SetOptions{})
+		_ = c.Set(ctx, "key2", []byte("value2"), cache.SetOptions{})
+		_ = c.Set(ctx, "key3", []byte("value3"), cache.SetOptions{})
+
+		// Access key1 to make it recently used
+		_, _, _ = c.Get(ctx, "key1")
+
+		// Add new key, triggering eviction
+		_ = c.Set(ctx, "key4", []byte("value4"), cache.SetOptions{})
+
+		// key1 should still exist (recently accessed)
+		_, found1, _ := c.Get(ctx, "key1")
+		if !found1 {
+			t.Error("recently accessed key1 should survive eviction")
+		}
+
+		// key4 should exist (just added)
+		_, found4, _ := c.Get(ctx, "key4")
+		if !found4 {
+			t.Error("newly added key4 should exist")
+		}
+	})
+
+	t.Run("cache_returns_copies_not_references", func(t *testing.T) {
+		c := memory.NewCache()
+		ctx := context.Background()
+
+		key := "immutable-key"
+		originalValue := []byte(`{"original": true}`)
+
+		_ = c.Set(ctx, key, originalValue, cache.SetOptions{})
+
+		// Get the value
+		retrieved, _, _ := c.Get(ctx, key)
+
+		// Modify the retrieved value
+		retrieved[0] = 'X'
+
+		// Get again and verify original is unchanged
+		checkValue, _, _ := c.Get(ctx, key)
+		if checkValue[0] == 'X' {
+			t.Error("cache should return copies, not references")
+		}
+	})
+}
+
+// =============================================================================
+// Invariant 10: Replay Determinism
+// Event replay produces identical run state from the same events.
+// =============================================================================
+
+func TestInvariant_ReplayDeterminism(t *testing.T) {
+	t.Run("reconstruct_run_from_events", func(t *testing.T) {
+		eventStore := memory.NewEventStore()
+		ctx := context.Background()
+		runID := "replay-test-run"
+
+		// Create a sequence of events
+		events := []event.Event{
+			mustCreateEvent(t, runID, event.TypeRunStarted, event.RunStartedPayload{
+				Goal: "test goal",
+				Vars: map[string]any{"key": "value"},
+			}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateIntake,
+				ToState:   agent.StateExplore,
+				Reason:    "begin exploration",
+			}),
+			mustCreateEvent(t, runID, event.TypeEvidenceAdded, event.EvidenceAddedPayload{
+				Type:    string(agent.EvidenceToolResult),
+				Source:  "read_file",
+				Content: json.RawMessage(`{"data": "file content"}`),
+			}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateExplore,
+				ToState:   agent.StateDecide,
+				Reason:    "done exploring",
+			}),
+			mustCreateEvent(t, runID, event.TypeRunCompleted, event.RunCompletedPayload{
+				Result:   json.RawMessage(`{"status": "success"}`),
+				Duration: 5 * time.Second,
+			}),
+		}
+
+		// Append events
+		if err := eventStore.Append(ctx, events...); err != nil {
+			t.Fatalf("failed to append events: %v", err)
+		}
+
+		// Replay and reconstruct
+		replay := application.NewReplay(eventStore)
+		run, err := replay.ReconstructRun(ctx, runID)
+		if err != nil {
+			t.Fatalf("ReconstructRun failed: %v", err)
+		}
+
+		// Verify reconstructed state
+		if run.ID != runID {
+			t.Errorf("expected run ID %s, got %s", runID, run.ID)
+		}
+		if run.Goal != "test goal" {
+			t.Errorf("expected goal 'test goal', got %s", run.Goal)
+		}
+		if run.Status != agent.RunStatusCompleted {
+			t.Errorf("expected completed status, got %s", run.Status)
+		}
+		if len(run.Evidence) != 1 {
+			t.Errorf("expected 1 evidence item, got %d", len(run.Evidence))
+		}
+	})
+
+	t.Run("multiple_replays_produce_identical_results", func(t *testing.T) {
+		eventStore := memory.NewEventStore()
+		ctx := context.Background()
+		runID := "determinism-test"
+
+		// Create events
+		events := []event.Event{
+			mustCreateEvent(t, runID, event.TypeRunStarted, event.RunStartedPayload{
+				Goal: "determinism test",
+			}),
+			mustCreateEvent(t, runID, event.TypeVariableSet, event.VariableSetPayload{
+				Key:   "counter",
+				Value: 42,
+			}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateIntake,
+				ToState:   agent.StateExplore,
+				Reason:    "start",
+			}),
+		}
+
+		_ = eventStore.Append(ctx, events...)
+
+		replay := application.NewReplay(eventStore)
+
+		// Replay multiple times
+		var runs []*agent.Run
+		for i := 0; i < 5; i++ {
+			run, err := replay.ReconstructRun(ctx, runID)
+			if err != nil {
+				t.Fatalf("Replay %d failed: %v", i, err)
+			}
+			runs = append(runs, run)
+		}
+
+		// Verify all replays are identical
+		first := runs[0]
+		for i := 1; i < len(runs); i++ {
+			if runs[i].ID != first.ID {
+				t.Errorf("Replay %d: ID mismatch", i)
+			}
+			if runs[i].Goal != first.Goal {
+				t.Errorf("Replay %d: Goal mismatch", i)
+			}
+			if runs[i].CurrentState != first.CurrentState {
+				t.Errorf("Replay %d: CurrentState mismatch", i)
+			}
+		}
+	})
+
+	t.Run("timeline_state_transitions_ordered", func(t *testing.T) {
+		eventStore := memory.NewEventStore()
+		ctx := context.Background()
+		runID := "timeline-test"
+
+		// Create events with state transitions
+		events := []event.Event{
+			mustCreateEvent(t, runID, event.TypeRunStarted, event.RunStartedPayload{Goal: "timeline"}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateIntake, ToState: agent.StateExplore, Reason: "1",
+			}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateExplore, ToState: agent.StateDecide, Reason: "2",
+			}),
+			mustCreateEvent(t, runID, event.TypeStateTransitioned, event.StateTransitionedPayload{
+				FromState: agent.StateDecide, ToState: agent.StateAct, Reason: "3",
+			}),
+		}
+
+		_ = eventStore.Append(ctx, events...)
+
+		replay := application.NewReplay(eventStore)
+		timeline, err := replay.NewTimeline(ctx, runID)
+		if err != nil {
+			t.Fatalf("NewTimeline failed: %v", err)
+		}
+
+		transitions := timeline.StateTransitions()
+		if len(transitions) != 3 {
+			t.Fatalf("expected 3 transitions, got %d", len(transitions))
+		}
+
+		// Verify order
+		expectedStates := []agent.State{agent.StateExplore, agent.StateDecide, agent.StateAct}
+		for i, tr := range transitions {
+			if tr.To != expectedStates[i] {
+				t.Errorf("transition %d: expected %s, got %s", i, expectedStates[i], tr.To)
+			}
+		}
+	})
+}
+
+// =============================================================================
+// Invariant 11: Artifact Integrity
+// Artifacts maintain stable references and preserve content integrity.
+// =============================================================================
+
+func TestInvariant_ArtifactIntegrity(t *testing.T) {
+	t.Run("artifact_ref_id_is_stable", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "artifact-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		store, err := filesystem.NewArtifactStore(tempDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		ctx := context.Background()
+		content := []byte("test artifact content")
+
+		// Store artifact
+		ref, err := store.Store(ctx, bytes.NewReader(content), artifact.StoreOptions{
+			Name:            "test-artifact",
+			ContentType:     "text/plain",
+			ComputeChecksum: true,
+		})
+		if err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+
+		// ID should be non-empty and stable
+		if ref.ID == "" {
+			t.Error("artifact ID should not be empty")
+		}
+
+		// Retrieve metadata and verify ID is unchanged
+		metaRef, err := store.Metadata(ctx, ref)
+		if err != nil {
+			t.Fatalf("Metadata failed: %v", err)
+		}
+		if metaRef.ID != ref.ID {
+			t.Errorf("artifact ID changed: expected %s, got %s", ref.ID, metaRef.ID)
+		}
+	})
+
+	t.Run("artifact_content_preserved_exactly", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "artifact-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		store, err := filesystem.NewArtifactStore(tempDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		ctx := context.Background()
+
+		// Test various content types
+		testCases := []struct {
+			name    string
+			content []byte
+		}{
+			{"empty", []byte{}},
+			{"text", []byte("Hello, World!")},
+			{"binary", []byte{0x00, 0xFF, 0x42, 0x89, 0xAB}},
+			{"json", []byte(`{"key": "value", "number": 123}`)},
+			{"large", bytes.Repeat([]byte("X"), 10000)},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				ref, err := store.Store(ctx, bytes.NewReader(tc.content), artifact.DefaultStoreOptions())
+				if err != nil {
+					t.Fatalf("Store failed: %v", err)
+				}
+
+				// Retrieve and compare
+				reader, err := store.Retrieve(ctx, ref)
+				if err != nil {
+					t.Fatalf("Retrieve failed: %v", err)
+				}
+				defer reader.Close()
+
+				retrieved, err := io.ReadAll(reader)
+				if err != nil {
+					t.Fatalf("ReadAll failed: %v", err)
+				}
+
+				if !bytes.Equal(retrieved, tc.content) {
+					t.Errorf("content mismatch: expected %d bytes, got %d bytes",
+						len(tc.content), len(retrieved))
+				}
+			})
+		}
+	})
+
+	t.Run("artifact_checksum_validates_integrity", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "artifact-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		store, err := filesystem.NewArtifactStore(tempDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		ctx := context.Background()
+		content := []byte("content for checksum verification")
+
+		ref, err := store.Store(ctx, bytes.NewReader(content), artifact.StoreOptions{
+			ComputeChecksum: true,
+		})
+		if err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+
+		// Checksum should be computed
+		if ref.Checksum == "" {
+			t.Error("checksum should be computed when requested")
+		}
+
+		// Store same content again - should produce same checksum
+		ref2, err := store.Store(ctx, bytes.NewReader(content), artifact.StoreOptions{
+			ComputeChecksum: true,
+		})
+		if err != nil {
+			t.Fatalf("Second Store failed: %v", err)
+		}
+
+		if ref.Checksum != ref2.Checksum {
+			t.Errorf("same content should produce same checksum: %s vs %s",
+				ref.Checksum, ref2.Checksum)
+		}
+
+		// Different content should produce different checksum
+		ref3, err := store.Store(ctx, bytes.NewReader([]byte("different content")), artifact.StoreOptions{
+			ComputeChecksum: true,
+		})
+		if err != nil {
+			t.Fatalf("Third Store failed: %v", err)
+		}
+
+		if ref.Checksum == ref3.Checksum {
+			t.Error("different content should produce different checksum")
+		}
+	})
+
+	t.Run("artifact_exists_and_delete", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "artifact-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		store, err := filesystem.NewArtifactStore(tempDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		ctx := context.Background()
+		content := []byte("deletable content")
+
+		ref, err := store.Store(ctx, bytes.NewReader(content), artifact.DefaultStoreOptions())
+		if err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+
+		// Should exist after store
+		exists, err := store.Exists(ctx, ref)
+		if err != nil {
+			t.Fatalf("Exists failed: %v", err)
+		}
+		if !exists {
+			t.Error("artifact should exist after store")
+		}
+
+		// Delete
+		err = store.Delete(ctx, ref)
+		if err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+
+		// Should not exist after delete
+		exists, _ = store.Exists(ctx, ref)
+		if exists {
+			t.Error("artifact should not exist after delete")
+		}
+
+		// Retrieve should fail
+		_, err = store.Retrieve(ctx, ref)
+		if !errors.Is(err, artifact.ErrArtifactNotFound) {
+			t.Errorf("expected ErrArtifactNotFound, got: %v", err)
+		}
+	})
+
+	t.Run("artifact_metadata_preserved", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "artifact-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		store, err := filesystem.NewArtifactStore(tempDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		ctx := context.Background()
+		content := []byte("content with metadata")
+
+		ref, err := store.Store(ctx, bytes.NewReader(content), artifact.StoreOptions{
+			Name:            "my-artifact",
+			ContentType:     "application/json",
+			ComputeChecksum: true,
+			Metadata: map[string]string{
+				"source": "test",
+				"runID":  "run-123",
+			},
+		})
+		if err != nil {
+			t.Fatalf("Store failed: %v", err)
+		}
+
+		// Retrieve metadata
+		meta, err := store.Metadata(ctx, ref)
+		if err != nil {
+			t.Fatalf("Metadata failed: %v", err)
+		}
+
+		// Verify all metadata preserved
+		if meta.Name != "my-artifact" {
+			t.Errorf("name not preserved: expected 'my-artifact', got %s", meta.Name)
+		}
+		if meta.ContentType != "application/json" {
+			t.Errorf("content type not preserved: expected 'application/json', got %s", meta.ContentType)
+		}
+		if meta.Size != int64(len(content)) {
+			t.Errorf("size not preserved: expected %d, got %d", len(content), meta.Size)
+		}
+		if meta.Metadata["source"] != "test" {
+			t.Errorf("metadata 'source' not preserved")
+		}
+		if meta.Metadata["runID"] != "run-123" {
+			t.Errorf("metadata 'runID' not preserved")
+		}
+	})
+}
+
+// Helper function to create events for tests
+func mustCreateEvent(t *testing.T, runID string, eventType event.Type, payload any) event.Event {
+	t.Helper()
+	e, err := event.NewEvent(runID, eventType, payload)
+	if err != nil {
+		t.Fatalf("failed to create event: %v", err)
+	}
+	return e
+}
+
+// =============================================================================
+// Invariant 12: Ledger Completeness
+// All significant operations are recorded in the ledger for audit purposes.
+// =============================================================================
+
+func TestInvariant_LedgerCompleteness(t *testing.T) {
+	t.Run("all_tool_executions_are_recorded", func(t *testing.T) {
+		// Create a read-only tool
+		readTool := api.NewToolBuilder("read_file").
+			WithDescription("Reads a file").
+			WithAnnotations(api.Annotations{ReadOnly: true}).
+			WithHandler(func(_ context.Context, _ json.RawMessage) (tool.Result, error) {
+				return tool.Result{Output: json.RawMessage(`{"content": "hello"}`)}, nil
+			}).
+			MustBuild()
+
+		// Create registry and eligibility
+		registry := api.NewToolRegistry()
+		if err := registry.Register(readTool); err != nil {
+			t.Fatalf("failed to register tool: %v", err)
+		}
+
+		eligibility := api.NewToolEligibility()
+		eligibility.Allow(agent.StateExplore, "read_file")
+
+		// Create scripted planner that calls the tool multiple times
+		scriptedPlanner := api.NewScriptedPlanner(
+			api.ScriptStep{
+				ExpectState: agent.StateIntake,
+				Decision:    api.NewTransitionDecision(agent.StateExplore, "to explore"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateExplore,
+				Decision:    api.NewCallToolDecision("read_file", json.RawMessage(`{"path": "/file1"}`), "read first"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateExplore,
+				Decision:    api.NewCallToolDecision("read_file", json.RawMessage(`{"path": "/file2"}`), "read second"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateExplore,
+				Decision:    api.NewTransitionDecision(agent.StateDecide, "done exploring"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateDecide,
+				Decision:    api.NewFinishDecision("completed", json.RawMessage(`{}`)),
+			},
+		)
+
+		engine, err := api.New(
+			api.WithRegistry(registry),
+			api.WithPlanner(scriptedPlanner),
+			api.WithToolEligibility(eligibility),
+			api.WithTransitions(api.DefaultTransitions()),
+			api.WithMaxSteps(20),
+		)
+		if err != nil {
+			t.Fatalf("failed to create engine: %v", err)
+		}
+
+		ctx := context.Background()
+		run, err := engine.Run(ctx, "test tool recording")
+		if err != nil {
+			t.Fatalf("run failed: %v", err)
+		}
+		if run.Status != agent.RunStatusCompleted {
+			t.Fatalf("expected completed, got: %s", run.Status)
+		}
+
+		// Verify evidence contains tool results (which come from ledger recording)
+		toolEvidenceCount := 0
+		for _, e := range run.Evidence {
+			if e.Type == agent.EvidenceToolResult {
+				toolEvidenceCount++
+			}
+		}
+
+		if toolEvidenceCount != 2 {
+			t.Errorf("expected 2 tool evidence items, got: %d", toolEvidenceCount)
+		}
+	})
+
+	t.Run("all_state_transitions_are_recorded", func(t *testing.T) {
+		// Test that ledger records state transitions by verifying
+		// the run's state history matches expected transitions
+		l := ledger.New("test-run-transitions")
+
+		// Record a sequence of transitions
+		transitions := []struct {
+			from   agent.State
+			to     agent.State
+			reason string
+		}{
+			{agent.StateIntake, agent.StateExplore, "begin exploration"},
+			{agent.StateExplore, agent.StateDecide, "gathered enough info"},
+			{agent.StateDecide, agent.StateAct, "decided to act"},
+			{agent.StateAct, agent.StateValidate, "action complete"},
+			{agent.StateValidate, agent.StateDone, "validated successfully"},
+		}
+
+		for _, tr := range transitions {
+			l.RecordTransition(tr.from, tr.to, tr.reason)
+		}
+
+		// Query by type
+		transitionEntries := l.EntriesByType(ledger.EntryStateTransition)
+		if len(transitionEntries) != len(transitions) {
+			t.Errorf("expected %d transition entries, got: %d", len(transitions), len(transitionEntries))
+		}
+
+		// Verify each transition was recorded correctly
+		for i, entry := range transitionEntries {
+			var details ledger.TransitionDetails
+			if err := entry.DecodeDetails(&details); err != nil {
+				t.Fatalf("failed to decode details: %v", err)
+			}
+			if details.FromState != transitions[i].from {
+				t.Errorf("transition %d: expected from %s, got %s", i, transitions[i].from, details.FromState)
+			}
+			if details.ToState != transitions[i].to {
+				t.Errorf("transition %d: expected to %s, got %s", i, transitions[i].to, details.ToState)
+			}
+			if details.Reason != transitions[i].reason {
+				t.Errorf("transition %d: expected reason %s, got %s", i, transitions[i].reason, details.Reason)
+			}
+		}
+	})
+
+	t.Run("entries_are_immutable_and_append_only", func(t *testing.T) {
+		l := ledger.New("test-run-immutable")
+
+		// Record initial entry
+		l.RecordRunStarted("test goal")
+		initialCount := l.Count()
+
+		// Get entries - should be a copy
+		entries := l.Entries()
+		initialEntryID := entries[0].ID
+
+		// Add more entries
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "transition")
+		l.RecordToolCall(agent.StateExplore, "test_tool", json.RawMessage(`{}`))
+
+		// Verify count increased (append-only)
+		if l.Count() != initialCount+2 {
+			t.Errorf("expected %d entries, got %d", initialCount+2, l.Count())
+		}
+
+		// Verify original entry ID is unchanged (immutable)
+		newEntries := l.Entries()
+		if newEntries[0].ID != initialEntryID {
+			t.Error("original entry ID changed - entries should be immutable")
+		}
+
+		// Verify entries returned are copies (modifying copy shouldn't affect ledger)
+		copiedEntries := l.Entries()
+		originalTimestamp := copiedEntries[0].Timestamp
+		copiedEntries[0].Timestamp = time.Time{} // Try to modify
+
+		freshEntries := l.Entries()
+		if freshEntries[0].Timestamp.IsZero() {
+			t.Error("modifying returned entries affected ledger - should return copies")
+		}
+		if freshEntries[0].Timestamp != originalTimestamp {
+			t.Error("timestamp changed - entries should be immutable")
+		}
+	})
+
+	t.Run("timestamps_and_ordering_are_correct", func(t *testing.T) {
+		l := ledger.New("test-run-timestamps")
+
+		// Record entries with small delays
+		l.RecordRunStarted("test goal")
+		time.Sleep(1 * time.Millisecond)
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "t1")
+		time.Sleep(1 * time.Millisecond)
+		l.RecordToolCall(agent.StateExplore, "tool1", json.RawMessage(`{}`))
+		time.Sleep(1 * time.Millisecond)
+		l.RecordToolResult(agent.StateExplore, "tool1", json.RawMessage(`{}`), 100*time.Millisecond, false)
+
+		entries := l.Entries()
+		if len(entries) != 4 {
+			t.Fatalf("expected 4 entries, got %d", len(entries))
+		}
+
+		// Verify chronological ordering
+		for i := 1; i < len(entries); i++ {
+			if entries[i].Timestamp.Before(entries[i-1].Timestamp) {
+				t.Errorf("entry %d timestamp (%v) is before entry %d timestamp (%v)",
+					i, entries[i].Timestamp, i-1, entries[i-1].Timestamp)
+			}
+		}
+
+		// Verify all timestamps are non-zero
+		for i, e := range entries {
+			if e.Timestamp.IsZero() {
+				t.Errorf("entry %d has zero timestamp", i)
+			}
+		}
+
+		// Verify all entries have unique IDs
+		ids := make(map[string]bool)
+		for i, e := range entries {
+			if e.ID == "" {
+				t.Errorf("entry %d has empty ID", i)
+			}
+			if ids[e.ID] {
+				t.Errorf("entry %d has duplicate ID: %s", i, e.ID)
+			}
+			ids[e.ID] = true
+		}
+	})
+
+	t.Run("queryable_by_run_id", func(t *testing.T) {
+		// Create two ledgers for different runs
+		l1 := ledger.New("run-1")
+		l2 := ledger.New("run-2")
+
+		l1.RecordRunStarted("goal 1")
+		l1.RecordToolCall(agent.StateExplore, "tool1", json.RawMessage(`{}`))
+
+		l2.RecordRunStarted("goal 2")
+		l2.RecordToolCall(agent.StateExplore, "tool2", json.RawMessage(`{}`))
+		l2.RecordToolCall(agent.StateExplore, "tool3", json.RawMessage(`{}`))
+
+		// Verify each ledger only contains its run's entries
+		if l1.RunID() != "run-1" {
+			t.Errorf("expected run ID 'run-1', got: %s", l1.RunID())
+		}
+		if l2.RunID() != "run-2" {
+			t.Errorf("expected run ID 'run-2', got: %s", l2.RunID())
+		}
+
+		// Verify entry counts
+		if l1.Count() != 2 {
+			t.Errorf("run-1 should have 2 entries, got: %d", l1.Count())
+		}
+		if l2.Count() != 3 {
+			t.Errorf("run-2 should have 3 entries, got: %d", l2.Count())
+		}
+
+		// Verify all entries in each ledger have correct run ID
+		for _, e := range l1.Entries() {
+			if e.RunID != "run-1" {
+				t.Errorf("entry in l1 has wrong run ID: %s", e.RunID)
+			}
+		}
+		for _, e := range l2.Entries() {
+			if e.RunID != "run-2" {
+				t.Errorf("entry in l2 has wrong run ID: %s", e.RunID)
+			}
+		}
+	})
+
+	t.Run("queryable_by_type", func(t *testing.T) {
+		l := ledger.New("test-run-query-type")
+
+		// Record various entry types
+		l.RecordRunStarted("test goal")
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "transition 1")
+		l.RecordTransition(agent.StateExplore, agent.StateDecide, "transition 2")
+		l.RecordDecision(agent.StateDecide, agent.Decision{
+			Type:       agent.DecisionCallTool,
+			CallTool:   &agent.CallToolDecision{ToolName: "test_tool"},
+		})
+		l.RecordToolCall(agent.StateExplore, "tool1", json.RawMessage(`{}`))
+		l.RecordToolCall(agent.StateExplore, "tool2", json.RawMessage(`{}`))
+		l.RecordToolResult(agent.StateExplore, "tool1", json.RawMessage(`{}`), 100*time.Millisecond, false)
+		l.RecordBudgetConsumed(agent.StateExplore, "tool_calls", 1, 9)
+		l.RecordRunCompleted(json.RawMessage(`{"result": "success"}`))
+
+		// Query by different types and verify counts
+		typeTests := []struct {
+			entryType ledger.EntryType
+			expected  int
+		}{
+			{ledger.EntryRunStarted, 1},
+			{ledger.EntryRunCompleted, 1},
+			{ledger.EntryStateTransition, 2},
+			{ledger.EntryDecision, 1},
+			{ledger.EntryToolCall, 2},
+			{ledger.EntryToolResult, 1},
+			{ledger.EntryBudgetConsumed, 1},
+		}
+
+		for _, tc := range typeTests {
+			entries := l.EntriesByType(tc.entryType)
+			if len(entries) != tc.expected {
+				t.Errorf("expected %d entries of type %s, got %d", tc.expected, tc.entryType, len(entries))
+			}
+
+			// Verify all returned entries have correct type
+			for _, e := range entries {
+				if e.Type != tc.entryType {
+					t.Errorf("entry has wrong type: expected %s, got %s", tc.entryType, e.Type)
+				}
+			}
+		}
+	})
+
+	t.Run("last_entry_returns_most_recent", func(t *testing.T) {
+		l := ledger.New("test-run-last")
+
+		// Empty ledger should return nil
+		if l.LastEntry() != nil {
+			t.Error("empty ledger should return nil for LastEntry")
+		}
+
+		// Add entries and verify last entry is correct
+		l.RecordRunStarted("test")
+		last := l.LastEntry()
+		if last == nil || last.Type != ledger.EntryRunStarted {
+			t.Error("last entry should be run_started")
+		}
+
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "transition")
+		last = l.LastEntry()
+		if last == nil || last.Type != ledger.EntryStateTransition {
+			t.Error("last entry should be state_transition")
+		}
+
+		l.RecordToolCall(agent.StateExplore, "tool", json.RawMessage(`{}`))
+		last = l.LastEntry()
+		if last == nil || last.Type != ledger.EntryToolCall {
+			t.Error("last entry should be tool_call")
+		}
+	})
+
+	t.Run("all_entry_types_are_recorded_correctly", func(t *testing.T) {
+		l := ledger.New("test-run-all-types")
+
+		// Record all entry types
+		l.RecordRunStarted("goal")
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "reason")
+		l.RecordDecision(agent.StateExplore, agent.Decision{
+			Type:       agent.DecisionCallTool,
+			CallTool:   &agent.CallToolDecision{ToolName: "test"},
+		})
+		l.RecordToolCall(agent.StateExplore, "tool", json.RawMessage(`{"input": 1}`))
+		l.RecordToolResult(agent.StateExplore, "tool", json.RawMessage(`{"output": 2}`), 50*time.Millisecond, false)
+		l.RecordToolError(agent.StateExplore, "tool", errors.New("test error"))
+		l.RecordApprovalRequest(agent.StateAct, "dangerous_tool", json.RawMessage(`{}`), "high")
+		l.RecordApprovalResult(agent.StateAct, "dangerous_tool", true, "admin", "approved for testing")
+		l.RecordBudgetConsumed(agent.StateExplore, "tool_calls", 1, 99)
+		l.RecordBudgetExhausted(agent.StateExplore, "api_tokens")
+		l.RecordHumanInputRequest(agent.StateDecide, "Continue?", []string{"yes", "no"})
+		l.RecordHumanInputResponse(agent.StateDecide, "Continue?", "yes")
+		l.RecordRunCompleted(json.RawMessage(`{"final": "result"}`))
+
+		// Verify total count
+		if l.Count() != 13 {
+			t.Errorf("expected 13 entries, got %d", l.Count())
+		}
+
+		// Verify each type was recorded
+		expectedTypes := map[ledger.EntryType]int{
+			ledger.EntryRunStarted:         1,
+			ledger.EntryStateTransition:    1,
+			ledger.EntryDecision:           1,
+			ledger.EntryToolCall:           1,
+			ledger.EntryToolResult:         1,
+			ledger.EntryToolError:          1,
+			ledger.EntryApprovalRequest:    1,
+			ledger.EntryApprovalResult:     1,
+			ledger.EntryBudgetConsumed:     1,
+			ledger.EntryBudgetExhausted:    1,
+			ledger.EntryHumanInputRequest:  1,
+			ledger.EntryHumanInputResponse: 1,
+			ledger.EntryRunCompleted:       1,
+		}
+
+		for entryType, expectedCount := range expectedTypes {
+			entries := l.EntriesByType(entryType)
+			if len(entries) != expectedCount {
+				t.Errorf("expected %d entries of type %s, got %d", expectedCount, entryType, len(entries))
+			}
+		}
+	})
+
+	t.Run("run_failed_is_recorded", func(t *testing.T) {
+		l := ledger.New("test-run-failed")
+
+		l.RecordRunStarted("will fail")
+		l.RecordTransition(agent.StateIntake, agent.StateExplore, "start")
+		l.RecordRunFailed(agent.StateExplore, "something went wrong")
+
+		failedEntries := l.EntriesByType(ledger.EntryRunFailed)
+		if len(failedEntries) != 1 {
+			t.Fatalf("expected 1 run_failed entry, got %d", len(failedEntries))
+		}
+
+		// Verify failure details
+		var details map[string]string
+		if err := failedEntries[0].DecodeDetails(&details); err != nil {
+			t.Fatalf("failed to decode details: %v", err)
+		}
+		if details["reason"] != "something went wrong" {
+			t.Errorf("expected reason 'something went wrong', got: %s", details["reason"])
+		}
+	})
+
+	t.Run("concurrent_access_is_thread_safe", func(t *testing.T) {
+		l := ledger.New("test-run-concurrent")
+
+		// Spawn multiple goroutines writing to the ledger
+		const numGoroutines = 10
+		const entriesPerGoroutine = 100
+
+		done := make(chan bool, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(goroutineID int) {
+				for j := 0; j < entriesPerGoroutine; j++ {
+					l.RecordToolCall(
+						agent.StateExplore,
+						"tool",
+						json.RawMessage(`{}`),
+					)
+				}
+				done <- true
+			}(i)
+		}
+
+		// Wait for all goroutines
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+
+		// Verify total count
+		expectedTotal := numGoroutines * entriesPerGoroutine
+		if l.Count() != expectedTotal {
+			t.Errorf("expected %d entries, got %d", expectedTotal, l.Count())
 		}
 	})
 }
