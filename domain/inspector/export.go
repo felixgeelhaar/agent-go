@@ -22,6 +22,18 @@ const (
 
 	// FormatMermaid exports as Mermaid diagram.
 	FormatMermaid ExportFormat = "mermaid"
+
+	// FormatHTML exports as an interactive HTML timeline.
+	FormatHTML ExportFormat = "html"
+
+	// FormatCSV exports as CSV (tool calls and state transitions).
+	FormatCSV ExportFormat = "csv"
+
+	// FormatPrometheus exports metrics in Prometheus format.
+	FormatPrometheus ExportFormat = "prometheus"
+
+	// FormatXState exports state machine as XState JSON.
+	FormatXState ExportFormat = "xstate"
 )
 
 // RunExport contains exported data for a single run.
