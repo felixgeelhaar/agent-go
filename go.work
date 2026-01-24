@@ -28,6 +28,7 @@ use (
 	./contrib/pack-git
 	./contrib/pack-github
 	./contrib/pack-graphql
+	./contrib/pack-grpc
 	./contrib/pack-hash
 	./contrib/pack-html
 	./contrib/pack-http
@@ -41,8 +42,10 @@ use (
 	./contrib/pack-messaging
 	./contrib/pack-monitoring
 	./contrib/pack-notification
+	./contrib/pack-openapi
 	./contrib/pack-pdf
 	./contrib/pack-process
+	./contrib/pack-prompt
 	./contrib/pack-qrcode
 	./contrib/pack-random
 	./contrib/pack-regex
@@ -54,6 +57,7 @@ use (
 	./contrib/pack-slack
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
+	./contrib/pack-ssh
 	./contrib/pack-stats
 	./contrib/pack-sysinfo
 	./contrib/pack-template
