@@ -20,6 +20,7 @@ use (
 	./contrib/pack-cloud
 	./contrib/pack-color
 	./contrib/pack-compression
+	./contrib/pack-config
 	./contrib/pack-copilot
 	./contrib/pack-crypto
 	./contrib/pack-database
@@ -46,12 +47,14 @@ use (
 	./contrib/pack-license
 	./contrib/pack-llm
 	./contrib/pack-markdown
+	./contrib/pack-math
 	./contrib/pack-messaging
 	./contrib/pack-metrics
 	./contrib/pack-mime
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-openapi
+	./contrib/pack-path
 	./contrib/pack-pdf
 	./contrib/pack-pluralize
 	./contrib/pack-process
@@ -74,6 +77,7 @@ use (
 	./contrib/pack-sse
 	./contrib/pack-ssh
 	./contrib/pack-stats
+	./contrib/pack-string
 	./contrib/pack-sysinfo
 	./contrib/pack-template
 	./contrib/pack-time
