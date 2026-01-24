@@ -18,7 +18,9 @@ use (
 	./contrib/pack-database
 	./contrib/pack-dataframe
 	./contrib/pack-diff
+	./contrib/pack-dns
 	./contrib/pack-email
+	./contrib/pack-env
 	./contrib/pack-fileops
 	./contrib/pack-filesystem
 	./contrib/pack-git
@@ -36,16 +38,19 @@ use (
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-pdf
+	./contrib/pack-process
 	./contrib/pack-qrcode
 	./contrib/pack-regex
 	./contrib/pack-search
 	./contrib/pack-secrets
 	./contrib/pack-semver
 	./contrib/pack-shell
+	./contrib/pack-similarity
 	./contrib/pack-slack
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
 	./contrib/pack-stats
+	./contrib/pack-sysinfo
 	./contrib/pack-template
 	./contrib/pack-time
 	./contrib/pack-vectordb
