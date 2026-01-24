@@ -28,6 +28,7 @@ use (
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-pdf
+	./contrib/pack-regex
 	./contrib/pack-search
 	./contrib/pack-secrets
 	./contrib/pack-shell
