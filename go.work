@@ -21,7 +21,9 @@ use (
 	./contrib/pack-color
 	./contrib/pack-compression
 	./contrib/pack-config
+	./contrib/pack-convert
 	./contrib/pack-copilot
+	./contrib/pack-cron
 	./contrib/pack-crypto
 	./contrib/pack-database
 	./contrib/pack-dataframe
@@ -31,6 +33,8 @@ use (
 	./contrib/pack-env
 	./contrib/pack-fileops
 	./contrib/pack-filesystem
+	./contrib/pack-fuzzy
+	./contrib/pack-geo
 	./contrib/pack-git
 	./contrib/pack-github
 	./contrib/pack-graphql
