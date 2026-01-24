@@ -20,16 +20,19 @@ use (
 	./contrib/pack-filesystem
 	./contrib/pack-git
 	./contrib/pack-github
+	./contrib/pack-html
 	./contrib/pack-http
 	./contrib/pack-image
 	./contrib/pack-jira
 	./contrib/pack-json
 	./contrib/pack-kubernetes
 	./contrib/pack-llm
+	./contrib/pack-markdown
 	./contrib/pack-messaging
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-pdf
+	./contrib/pack-qrcode
 	./contrib/pack-regex
 	./contrib/pack-search
 	./contrib/pack-secrets
@@ -41,6 +44,7 @@ use (
 	./contrib/pack-template
 	./contrib/pack-time
 	./contrib/pack-vectordb
+	./contrib/pack-xml
 	./contrib/pack-yaml
 	./contrib/planner-llm
 	./contrib/storage-badger
