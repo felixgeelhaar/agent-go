@@ -24,6 +24,8 @@ use (
 	./contrib/pack-config
 	./contrib/pack-convert
 	./contrib/pack-copilot
+	./contrib/pack-country
+	./contrib/pack-creditcard
 	./contrib/pack-cron
 	./contrib/pack-crypto
 	./contrib/pack-database
@@ -31,6 +33,7 @@ use (
 	./contrib/pack-diff
 	./contrib/pack-dns
 	./contrib/pack-email
+	./contrib/pack-emoji
 	./contrib/pack-env
 	./contrib/pack-fileops
 	./contrib/pack-filesystem
@@ -91,6 +94,7 @@ use (
 	./contrib/pack-time
 	./contrib/pack-tokenizer
 	./contrib/pack-url
+	./contrib/pack-useragent
 	./contrib/pack-uuid
 	./contrib/pack-validate
 	./contrib/pack-vectordb
