@@ -35,6 +35,7 @@ use (
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
 	./contrib/pack-vectordb
+	./contrib/pack-yaml
 	./contrib/planner-llm
 	./contrib/storage-badger
 	./contrib/storage-dynamodb
