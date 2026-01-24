@@ -34,6 +34,7 @@ use (
 	./contrib/pack-slack
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
+	./contrib/pack-template
 	./contrib/pack-vectordb
 	./contrib/pack-yaml
 	./contrib/planner-llm
