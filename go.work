@@ -9,6 +9,7 @@ use (
 	./contrib/otel
 	./contrib/pack-archive
 	./contrib/pack-ast
+	./contrib/pack-base64
 	./contrib/pack-browser
 	./contrib/pack-cache
 	./contrib/pack-changelog
@@ -16,6 +17,7 @@ use (
 	./contrib/pack-chunker
 	./contrib/pack-cloud
 	./contrib/pack-color
+	./contrib/pack-compression
 	./contrib/pack-copilot
 	./contrib/pack-crypto
 	./contrib/pack-database
@@ -52,6 +54,7 @@ use (
 	./contrib/pack-random
 	./contrib/pack-rate
 	./contrib/pack-regex
+	./contrib/pack-scheduler
 	./contrib/pack-search
 	./contrib/pack-secrets
 	./contrib/pack-semver
@@ -67,6 +70,7 @@ use (
 	./contrib/pack-template
 	./contrib/pack-time
 	./contrib/pack-tokenizer
+	./contrib/pack-url
 	./contrib/pack-uuid
 	./contrib/pack-validate
 	./contrib/pack-vectordb
