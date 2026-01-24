@@ -10,6 +10,7 @@ use (
 	./contrib/pack-archive
 	./contrib/pack-ast
 	./contrib/pack-browser
+	./contrib/pack-cache
 	./contrib/pack-changelog
 	./contrib/pack-chart
 	./contrib/pack-chunker
@@ -35,6 +36,7 @@ use (
 	./contrib/pack-image
 	./contrib/pack-jira
 	./contrib/pack-json
+	./contrib/pack-jwt
 	./contrib/pack-kubernetes
 	./contrib/pack-license
 	./contrib/pack-llm
@@ -48,6 +50,7 @@ use (
 	./contrib/pack-prompt
 	./contrib/pack-qrcode
 	./contrib/pack-random
+	./contrib/pack-rate
 	./contrib/pack-regex
 	./contrib/pack-search
 	./contrib/pack-secrets
@@ -57,6 +60,7 @@ use (
 	./contrib/pack-slack
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
+	./contrib/pack-sse
 	./contrib/pack-ssh
 	./contrib/pack-stats
 	./contrib/pack-sysinfo
