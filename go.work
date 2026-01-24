@@ -17,6 +17,7 @@ use (
 	./contrib/pack-github
 	./contrib/pack-http
 	./contrib/pack-image
+	./contrib/pack-jira
 	./contrib/pack-kubernetes
 	./contrib/pack-llm
 	./contrib/pack-messaging
