@@ -36,6 +36,7 @@ use (
 	./contrib/pack-spreadsheet
 	./contrib/pack-sql
 	./contrib/pack-template
+	./contrib/pack-time
 	./contrib/pack-vectordb
 	./contrib/pack-yaml
 	./contrib/planner-llm
