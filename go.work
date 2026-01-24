@@ -20,6 +20,7 @@ use (
 	./contrib/pack-http
 	./contrib/pack-image
 	./contrib/pack-jira
+	./contrib/pack-json
 	./contrib/pack-kubernetes
 	./contrib/pack-llm
 	./contrib/pack-messaging
