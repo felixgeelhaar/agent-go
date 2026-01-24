@@ -36,6 +36,7 @@ use (
 	./contrib/pack-html
 	./contrib/pack-http
 	./contrib/pack-image
+	./contrib/pack-ip
 	./contrib/pack-jira
 	./contrib/pack-json
 	./contrib/pack-jwt
@@ -44,6 +45,8 @@ use (
 	./contrib/pack-llm
 	./contrib/pack-markdown
 	./contrib/pack-messaging
+	./contrib/pack-metrics
+	./contrib/pack-mime
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-openapi
@@ -54,6 +57,7 @@ use (
 	./contrib/pack-random
 	./contrib/pack-rate
 	./contrib/pack-regex
+	./contrib/pack-retry
 	./contrib/pack-scheduler
 	./contrib/pack-search
 	./contrib/pack-secrets
