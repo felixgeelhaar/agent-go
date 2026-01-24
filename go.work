@@ -11,6 +11,7 @@ use (
 	./contrib/pack-browser
 	./contrib/pack-cloud
 	./contrib/pack-copilot
+	./contrib/pack-crypto
 	./contrib/pack-database
 	./contrib/pack-email
 	./contrib/pack-fileops
