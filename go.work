@@ -14,6 +14,7 @@ use (
 	./contrib/pack-fileops
 	./contrib/pack-filesystem
 	./contrib/pack-git
+	./contrib/pack-github
 	./contrib/pack-http
 	./contrib/pack-image
 	./contrib/pack-kubernetes
@@ -25,6 +26,7 @@ use (
 	./contrib/pack-search
 	./contrib/pack-secrets
 	./contrib/pack-shell
+	./contrib/pack-slack
 	./contrib/pack-vectordb
 	./contrib/planner-llm
 	./contrib/storage-badger
