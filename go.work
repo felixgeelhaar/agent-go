@@ -13,6 +13,7 @@ use (
 	./contrib/pack-changelog
 	./contrib/pack-chart
 	./contrib/pack-cloud
+	./contrib/pack-color
 	./contrib/pack-copilot
 	./contrib/pack-crypto
 	./contrib/pack-database
@@ -25,6 +26,7 @@ use (
 	./contrib/pack-filesystem
 	./contrib/pack-git
 	./contrib/pack-github
+	./contrib/pack-hash
 	./contrib/pack-html
 	./contrib/pack-http
 	./contrib/pack-image
@@ -40,6 +42,7 @@ use (
 	./contrib/pack-pdf
 	./contrib/pack-process
 	./contrib/pack-qrcode
+	./contrib/pack-random
 	./contrib/pack-regex
 	./contrib/pack-search
 	./contrib/pack-secrets
@@ -53,6 +56,8 @@ use (
 	./contrib/pack-sysinfo
 	./contrib/pack-template
 	./contrib/pack-time
+	./contrib/pack-uuid
+	./contrib/pack-validate
 	./contrib/pack-vectordb
 	./contrib/pack-xml
 	./contrib/pack-yaml
