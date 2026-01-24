@@ -18,6 +18,7 @@ use (
 	./contrib/pack-chart
 	./contrib/pack-chunker
 	./contrib/pack-cloud
+	./contrib/pack-collection
 	./contrib/pack-color
 	./contrib/pack-compression
 	./contrib/pack-config
@@ -33,6 +34,7 @@ use (
 	./contrib/pack-env
 	./contrib/pack-fileops
 	./contrib/pack-filesystem
+	./contrib/pack-finance
 	./contrib/pack-fuzzy
 	./contrib/pack-geo
 	./contrib/pack-git
@@ -58,8 +60,10 @@ use (
 	./contrib/pack-monitoring
 	./contrib/pack-notification
 	./contrib/pack-openapi
+	./contrib/pack-password
 	./contrib/pack-path
 	./contrib/pack-pdf
+	./contrib/pack-phone
 	./contrib/pack-pluralize
 	./contrib/pack-process
 	./contrib/pack-prompt
