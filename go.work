@@ -12,6 +12,7 @@ use (
 	./contrib/pack-browser
 	./contrib/pack-changelog
 	./contrib/pack-chart
+	./contrib/pack-chunker
 	./contrib/pack-cloud
 	./contrib/pack-color
 	./contrib/pack-copilot
@@ -26,6 +27,7 @@ use (
 	./contrib/pack-filesystem
 	./contrib/pack-git
 	./contrib/pack-github
+	./contrib/pack-graphql
 	./contrib/pack-hash
 	./contrib/pack-html
 	./contrib/pack-http
@@ -56,9 +58,11 @@ use (
 	./contrib/pack-sysinfo
 	./contrib/pack-template
 	./contrib/pack-time
+	./contrib/pack-tokenizer
 	./contrib/pack-uuid
 	./contrib/pack-validate
 	./contrib/pack-vectordb
+	./contrib/pack-websocket
 	./contrib/pack-xml
 	./contrib/pack-yaml
 	./contrib/planner-llm
