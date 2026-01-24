@@ -28,6 +28,7 @@ use (
 	./contrib/pack-secrets
 	./contrib/pack-shell
 	./contrib/pack-slack
+	./contrib/pack-sql
 	./contrib/pack-vectordb
 	./contrib/planner-llm
 	./contrib/storage-badger
