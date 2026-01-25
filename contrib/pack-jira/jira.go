@@ -7,11 +7,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
-	"github.com/andygrunwald/go-jira"
 	"github.com/felixgeelhaar/agent-go/domain/agent"
 	"github.com/felixgeelhaar/agent-go/domain/pack"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
+	jira "github.com/felixgeelhaar/jirasdk"
+	"github.com/felixgeelhaar/jirasdk/core/agile"
+	"github.com/felixgeelhaar/jirasdk/core/issue"
+	"github.com/felixgeelhaar/jirasdk/core/search"
+	"github.com/felixgeelhaar/jirasdk/core/user"
 )
 
 // Config holds Jira connection settings.
@@ -19,6 +24,7 @@ type Config struct {
 	BaseURL  string
 	Username string
 	APIToken string
+	Timeout  time.Duration
 }
 
 // Pack returns the Jira tool pack.
@@ -27,7 +33,7 @@ func Pack(cfg Config) *pack.Pack {
 
 	return pack.NewBuilder("jira").
 		WithDescription("Jira integration tools for issue tracking, projects, and sprints").
-		WithVersion("1.0.0").
+		WithVersion("2.0.0").
 		AddTools(
 			p.getIssueTool(),
 			p.createIssueTool(),
@@ -62,12 +68,16 @@ func (p *jiraPack) getClient() (*jira.Client, error) {
 		return p.client, nil
 	}
 
-	tp := jira.BasicAuthTransport{
-		Username: p.cfg.Username,
-		Password: p.cfg.APIToken,
+	timeout := p.cfg.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
 	}
 
-	client, err := jira.NewClient(tp.Client(), p.cfg.BaseURL)
+	client, err := jira.NewClient(
+		jira.WithBaseURL(p.cfg.BaseURL),
+		jira.WithAPIToken(p.cfg.Username, p.cfg.APIToken),
+		jira.WithTimeout(timeout),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jira client: %w", err)
 	}
@@ -100,20 +110,17 @@ func (p *jiraPack) getIssueTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			opts := &jira.GetQueryOptions{}
+			var opts *issue.GetOptions
 			if len(in.Fields) > 0 {
-				opts.Fields = in.Fields[0]
-				for i := 1; i < len(in.Fields); i++ {
-					opts.Fields += "," + in.Fields[i]
-				}
+				opts = &issue.GetOptions{Fields: in.Fields}
 			}
 
-			issue, _, err := client.Issue.Get(in.Key, opts)
+			iss, err := client.Issue.Get(ctx, in.Key, opts)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get issue: %w", err)
 			}
 
-			output, _ := json.Marshal(formatIssue(issue))
+			output, _ := json.Marshal(formatIssue(iss))
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
@@ -124,15 +131,14 @@ func (p *jiraPack) createIssueTool() tool.Tool {
 		WithDescription("Create a new Jira issue").
 		WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
 			var in struct {
-				Project     string            `json:"project"`
-				IssueType   string            `json:"issue_type"`
-				Summary     string            `json:"summary"`
-				Description string            `json:"description,omitempty"`
-				Priority    string            `json:"priority,omitempty"`
-				Labels      []string          `json:"labels,omitempty"`
-				Components  []string          `json:"components,omitempty"`
-				Assignee    string            `json:"assignee,omitempty"`
-				CustomFields map[string]any   `json:"custom_fields,omitempty"`
+				Project     string   `json:"project"`
+				IssueType   string   `json:"issue_type"`
+				Summary     string   `json:"summary"`
+				Description string   `json:"description,omitempty"`
+				Priority    string   `json:"priority,omitempty"`
+				Labels      []string `json:"labels,omitempty"`
+				Components  []string `json:"components,omitempty"`
+				Assignee    string   `json:"assignee,omitempty"`
 			}
 			if err := json.Unmarshal(input, &in); err != nil {
 				return tool.Result{}, err
@@ -143,33 +149,33 @@ func (p *jiraPack) createIssueTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			issue := &jira.Issue{
-				Fields: &jira.IssueFields{
-					Project:     jira.Project{Key: in.Project},
-					Type:        jira.IssueType{Name: in.IssueType},
-					Summary:     in.Summary,
-					Description: in.Description,
-				},
+			fields := &issue.IssueFields{
+				Summary:     in.Summary,
+				Description: in.Description,
+				Project:     &issue.Project{Key: in.Project},
+				IssueType:   &issue.IssueType{Name: in.IssueType},
 			}
 
 			if in.Priority != "" {
-				issue.Fields.Priority = &jira.Priority{Name: in.Priority}
+				fields.Priority = &issue.Priority{Name: in.Priority}
 			}
 			if len(in.Labels) > 0 {
-				issue.Fields.Labels = in.Labels
+				fields.Labels = in.Labels
 			}
 			if len(in.Components) > 0 {
-				components := make([]*jira.Component, len(in.Components))
+				components := make([]*issue.Component, len(in.Components))
 				for i, c := range in.Components {
-					components[i] = &jira.Component{Name: c}
+					components[i] = &issue.Component{Name: c}
 				}
-				issue.Fields.Components = components
+				fields.Components = components
 			}
 			if in.Assignee != "" {
-				issue.Fields.Assignee = &jira.User{AccountID: in.Assignee}
+				fields.Assignee = &issue.User{AccountID: in.Assignee}
 			}
 
-			created, _, err := client.Issue.Create(issue)
+			created, err := client.Issue.Create(ctx, &issue.CreateInput{
+				Fields: fields,
+			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to create issue: %w", err)
 			}
@@ -205,7 +211,6 @@ func (p *jiraPack) updateIssueTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			update := make(map[string]interface{})
 			fields := make(map[string]interface{})
 
 			if in.Summary != "" {
@@ -221,11 +226,9 @@ func (p *jiraPack) updateIssueTool() tool.Tool {
 				fields["labels"] = in.Labels
 			}
 
-			if len(fields) > 0 {
-				update["fields"] = fields
-			}
-
-			_, err = client.Issue.UpdateIssue(in.Key, update)
+			err = client.Issue.Update(ctx, in.Key, &issue.UpdateInput{
+				Fields: fields,
+			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to update issue: %w", err)
 			}
@@ -257,7 +260,7 @@ func (p *jiraPack) transitionIssueTool() tool.Tool {
 			}
 
 			// Get available transitions
-			transitions, _, err := client.Issue.GetTransitions(in.Key)
+			transitions, err := client.Workflow.GetTransitions(ctx, in.Key, nil)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get transitions: %w", err)
 			}
@@ -279,7 +282,9 @@ func (p *jiraPack) transitionIssueTool() tool.Tool {
 				return tool.Result{}, fmt.Errorf("transition not found, available: %v", available)
 			}
 
-			_, err = client.Issue.DoTransition(in.Key, transitionID)
+			err = client.Issue.DoTransition(ctx, in.Key, &issue.TransitionInput{
+				Transition: &issue.Transition{ID: transitionID},
+			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to transition: %w", err)
 			}
@@ -311,18 +316,24 @@ func (p *jiraPack) addCommentTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			comment, _, err := client.Issue.AddComment(in.Key, &jira.Comment{
+			comment, err := client.Issue.AddComment(ctx, in.Key, &issue.AddCommentInput{
 				Body: in.Body,
 			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to add comment: %w", err)
 			}
 
-			output, _ := json.Marshal(map[string]any{
-				"id":      comment.ID,
-				"created": comment.Created,
-				"author":  comment.Author.DisplayName,
-			})
+			result := map[string]any{
+				"id": comment.ID,
+			}
+			if comment.Created != nil {
+				result["created"] = comment.Created
+			}
+			if comment.Author != nil {
+				result["author"] = comment.Author.DisplayName
+			}
+
+			output, _ := json.Marshal(result)
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
@@ -346,24 +357,27 @@ func (p *jiraPack) getCommentsTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			issue, _, err := client.Issue.Get(in.Key, &jira.GetQueryOptions{
-				Fields: "comment",
-			})
+			commentList, err := client.Issue.ListComments(ctx, in.Key)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get comments: %w", err)
 			}
 
-			comments := make([]map[string]any, 0)
-			if issue.Fields.Comments != nil {
-				for _, c := range issue.Fields.Comments.Comments {
-					comments = append(comments, map[string]any{
-						"id":      c.ID,
-						"body":    c.Body,
-						"author":  c.Author.DisplayName,
-						"created": c.Created,
-						"updated": c.Updated,
-					})
+			comments := make([]map[string]any, 0, len(commentList))
+			for _, c := range commentList {
+				entry := map[string]any{
+					"id":   c.ID,
+					"body": c.Body,
 				}
+				if c.Author != nil {
+					entry["author"] = c.Author.DisplayName
+				}
+				if c.Created != nil {
+					entry["created"] = c.Created
+				}
+				if c.Updated != nil {
+					entry["updated"] = c.Updated
+				}
+				comments = append(comments, entry)
 			}
 
 			output, _ := json.Marshal(map[string]any{
@@ -393,12 +407,17 @@ func (p *jiraPack) assignIssueTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			var user *jira.User
-			if in.Assignee != "" {
-				user = &jira.User{AccountID: in.Assignee}
+			// Use Update to change assignee
+			fields := map[string]interface{}{
+				"assignee": map[string]string{"accountId": in.Assignee},
+			}
+			if in.Assignee == "" {
+				fields["assignee"] = nil
 			}
 
-			_, err = client.Issue.UpdateAssignee(in.Key, user)
+			err = client.Issue.Update(ctx, in.Key, &issue.UpdateInput{
+				Fields: fields,
+			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to assign: %w", err)
 			}
@@ -431,14 +450,10 @@ func (p *jiraPack) linkIssuesTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			_, err = client.Issue.AddLink(&jira.IssueLink{
-				Type: jira.IssueLinkType{Name: in.LinkType},
-				InwardIssue: &jira.Issue{
-					Key: in.InwardKey,
-				},
-				OutwardIssue: &jira.Issue{
-					Key: in.OutwardKey,
-				},
+			err = client.Issue.CreateIssueLink(ctx, &issue.CreateIssueLinkInput{
+				Type:         &issue.IssueLinkType{Name: in.LinkType},
+				InwardIssue:  &issue.IssueRef{Key: in.InwardKey},
+				OutwardIssue: &issue.IssueRef{Key: in.OutwardKey},
 			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to link issues: %w", err)
@@ -475,24 +490,28 @@ func (p *jiraPack) getProjectTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			project, _, err := client.Project.Get(in.Key)
+			proj, err := client.Project.Get(ctx, in.Key, nil)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get project: %w", err)
 			}
 
-			issueTypes := make([]string, len(project.IssueTypes))
-			for i, it := range project.IssueTypes {
+			issueTypes := make([]string, len(proj.IssueTypes))
+			for i, it := range proj.IssueTypes {
 				issueTypes[i] = it.Name
 			}
 
-			output, _ := json.Marshal(map[string]any{
-				"key":         project.Key,
-				"name":        project.Name,
-				"description": project.Description,
-				"lead":        project.Lead.DisplayName,
+			result := map[string]any{
+				"key":         proj.Key,
+				"name":        proj.Name,
+				"description": proj.Description,
 				"issue_types": issueTypes,
-				"self":        project.Self,
-			})
+				"self":        proj.Self,
+			}
+			if proj.Lead != nil {
+				result["lead"] = proj.Lead.DisplayName
+			}
+
+			output, _ := json.Marshal(result)
 			return tool.Result{Output: output}, nil
 		}).
 		MustBuild()
@@ -510,13 +529,13 @@ func (p *jiraPack) listProjectsTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			projects, _, err := client.Project.GetList()
+			projects, err := client.Project.List(ctx, nil)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to list projects: %w", err)
 			}
 
-			result := make([]map[string]any, len(*projects))
-			for i, proj := range *projects {
+			result := make([]map[string]any, len(projects))
+			for i, proj := range projects {
 				result[i] = map[string]any{
 					"key":  proj.Key,
 					"name": proj.Name,
@@ -561,25 +580,27 @@ func (p *jiraPack) searchIssuesTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			opts := &jira.SearchOptions{
+			opts := &search.SearchOptions{
+				JQL:        in.JQL,
 				MaxResults: in.MaxResults,
 			}
 			if len(in.Fields) > 0 {
 				opts.Fields = in.Fields
 			}
 
-			issues, _, err := client.Issue.Search(in.JQL, opts)
+			searchResult, err := client.Search.Search(ctx, opts)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to search: %w", err)
 			}
 
-			result := make([]map[string]any, len(issues))
-			for i, issue := range issues {
-				result[i] = formatIssue(&issue)
+			result := make([]map[string]any, len(searchResult.Issues))
+			for i, iss := range searchResult.Issues {
+				result[i] = formatIssue(iss)
 			}
 
 			output, _ := json.Marshal(map[string]any{
 				"count":  len(result),
+				"total":  searchResult.Total,
 				"issues": result,
 			})
 			return tool.Result{Output: output}, nil
@@ -616,16 +637,17 @@ func (p *jiraPack) getSprintTool() tool.Tool {
 
 			// Use JQL to find issues in the sprint
 			jql := fmt.Sprintf("sprint = \"%s\"", in.SprintName)
-			issues, _, err := client.Issue.Search(jql, &jira.SearchOptions{
+			searchResult, err := client.Search.Search(ctx, &search.SearchOptions{
+				JQL:        jql,
 				MaxResults: in.MaxResults,
 			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get sprint issues: %w", err)
 			}
 
-			result := make([]map[string]any, len(issues))
-			for i, issue := range issues {
-				result[i] = formatIssue(&issue)
+			result := make([]map[string]any, len(searchResult.Issues))
+			for i, iss := range searchResult.Issues {
+				result[i] = formatIssue(iss)
 			}
 
 			output, _ := json.Marshal(map[string]any{
@@ -645,7 +667,7 @@ func (p *jiraPack) listSprintsTool() tool.Tool {
 		Idempotent().
 		WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
 			var in struct {
-				BoardID int `json:"board_id"`
+				BoardID int64 `json:"board_id"`
 			}
 			if err := json.Unmarshal(input, &in); err != nil {
 				return tool.Result{}, err
@@ -656,7 +678,7 @@ func (p *jiraPack) listSprintsTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			sprints, _, err := client.Board.GetAllSprints(fmt.Sprintf("%d", in.BoardID))
+			sprints, err := client.Agile.GetBoardSprints(ctx, in.BoardID, nil)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to list sprints: %w", err)
 			}
@@ -688,8 +710,8 @@ func (p *jiraPack) getSprintIssuesTool() tool.Tool {
 		Idempotent().
 		WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
 			var in struct {
-				BoardID    int `json:"board_id"`
-				MaxResults int `json:"max_results,omitempty"`
+				BoardID    int64 `json:"board_id"`
+				MaxResults int   `json:"max_results,omitempty"`
 			}
 			if err := json.Unmarshal(input, &in); err != nil {
 				return tool.Result{}, err
@@ -706,16 +728,17 @@ func (p *jiraPack) getSprintIssuesTool() tool.Tool {
 
 			// Use JQL to find issues in active sprint for the board
 			jql := "sprint in openSprints()"
-			issues, _, err := client.Issue.Search(jql, &jira.SearchOptions{
+			searchResult, err := client.Search.Search(ctx, &search.SearchOptions{
+				JQL:        jql,
 				MaxResults: in.MaxResults,
 			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get sprint issues: %w", err)
 			}
 
-			result := make([]map[string]any, len(issues))
-			for i, issue := range issues {
-				result[i] = formatIssue(&issue)
+			result := make([]map[string]any, len(searchResult.Issues))
+			for i, iss := range searchResult.Issues {
+				result[i] = formatIssue(iss)
 			}
 
 			output, _ := json.Marshal(map[string]any{
@@ -729,10 +752,10 @@ func (p *jiraPack) getSprintIssuesTool() tool.Tool {
 
 func (p *jiraPack) moveToSprintTool() tool.Tool {
 	return tool.NewBuilder("jira_move_to_sprint").
-		WithDescription("Move issues to a sprint (updates issue sprint field)").
+		WithDescription("Move issues to a sprint").
 		WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
 			var in struct {
-				SprintID int      `json:"sprint_id"`
+				SprintID int64    `json:"sprint_id"`
 				Issues   []string `json:"issues"`
 			}
 			if err := json.Unmarshal(input, &in); err != nil {
@@ -744,17 +767,11 @@ func (p *jiraPack) moveToSprintTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			// Move each issue by updating the sprint field
-			for _, issueKey := range in.Issues {
-				update := map[string]interface{}{
-					"fields": map[string]interface{}{
-						"customfield_10020": in.SprintID, // Common sprint field ID
-					},
-				}
-				_, err = client.Issue.UpdateIssue(issueKey, update)
-				if err != nil {
-					return tool.Result{}, fmt.Errorf("failed to move issue %s: %w", issueKey, err)
-				}
+			err = client.Agile.MoveIssuesToSprint(ctx, in.SprintID, &agile.MoveIssuesToSprintInput{
+				Issues: in.Issues,
+			})
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("failed to move issues to sprint: %w", err)
 			}
 
 			output, _ := json.Marshal(map[string]any{
@@ -789,17 +806,17 @@ func (p *jiraPack) getUserTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			user, _, err := client.User.GetByAccountID(in.AccountID)
+			u, err := client.User.Get(ctx, in.AccountID, nil)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to get user: %w", err)
 			}
 
 			output, _ := json.Marshal(map[string]any{
-				"account_id":   user.AccountID,
-				"display_name": user.DisplayName,
-				"email":        user.EmailAddress,
-				"active":       user.Active,
-				"timezone":     user.TimeZone,
+				"account_id":   u.AccountID,
+				"display_name": u.DisplayName,
+				"email":        u.EmailAddress,
+				"active":       u.Active,
+				"timezone":     u.TimeZone,
 			})
 			return tool.Result{Output: output}, nil
 		}).
@@ -829,7 +846,10 @@ func (p *jiraPack) searchUsersTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			users, _, err := client.User.Find(in.Query, jira.WithMaxResults(in.MaxResults))
+			users, err := client.User.Search(ctx, &user.SearchOptions{
+				Query:      in.Query,
+				MaxResults: in.MaxResults,
+			})
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to search users: %w", err)
 			}
@@ -857,39 +877,43 @@ func (p *jiraPack) searchUsersTool() tool.Tool {
 // Helpers
 // ============================================================================
 
-func formatIssue(issue *jira.Issue) map[string]any {
+func formatIssue(iss *issue.Issue) map[string]any {
 	result := map[string]any{
-		"key":  issue.Key,
-		"id":   issue.ID,
-		"self": issue.Self,
+		"key":  iss.Key,
+		"id":   iss.ID,
+		"self": iss.Self,
 	}
 
-	if issue.Fields != nil {
-		result["summary"] = issue.Fields.Summary
-		result["description"] = issue.Fields.Description
-		result["created"] = issue.Fields.Created
-		result["updated"] = issue.Fields.Updated
+	if iss.Fields != nil {
+		result["summary"] = iss.Fields.Summary
+		result["description"] = iss.Fields.Description
 
-		if issue.Fields.Status != nil {
-			result["status"] = issue.Fields.Status.Name
+		if iss.Fields.Created != nil {
+			result["created"] = iss.Fields.Created
 		}
-		if issue.Fields.Priority != nil {
-			result["priority"] = issue.Fields.Priority.Name
+		if iss.Fields.Updated != nil {
+			result["updated"] = iss.Fields.Updated
 		}
-		if issue.Fields.Type.Name != "" {
-			result["issue_type"] = issue.Fields.Type.Name
+		if iss.Fields.Status != nil {
+			result["status"] = iss.Fields.Status.Name
 		}
-		if issue.Fields.Assignee != nil {
-			result["assignee"] = issue.Fields.Assignee.DisplayName
+		if iss.Fields.Priority != nil {
+			result["priority"] = iss.Fields.Priority.Name
 		}
-		if issue.Fields.Reporter != nil {
-			result["reporter"] = issue.Fields.Reporter.DisplayName
+		if iss.Fields.IssueType != nil {
+			result["issue_type"] = iss.Fields.IssueType.Name
 		}
-		if len(issue.Fields.Labels) > 0 {
-			result["labels"] = issue.Fields.Labels
+		if iss.Fields.Assignee != nil {
+			result["assignee"] = iss.Fields.Assignee.DisplayName
 		}
-		if issue.Fields.Project.Key != "" {
-			result["project"] = issue.Fields.Project.Key
+		if iss.Fields.Reporter != nil {
+			result["reporter"] = iss.Fields.Reporter.DisplayName
+		}
+		if len(iss.Fields.Labels) > 0 {
+			result["labels"] = iss.Fields.Labels
+		}
+		if iss.Fields.Project != nil {
+			result["project"] = iss.Fields.Project.Key
 		}
 	}
 
