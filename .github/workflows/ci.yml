@@ -29,7 +29,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.64.8
-          args: --timeout=5m
+          args: --timeout=10m
         continue-on-error: true  # Allow CI to pass while golangci-lint catches up to Go 1.25
 
   test-core:
@@ -56,47 +56,185 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
-  test-contrib:
-    name: Test Contrib Modules
+  test-contrib-storage:
+    name: Test Storage Backends
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         module:
-          - storage-postgres
-          - storage-mongodb
-          - storage-redis
-          - storage-sqlite
           - storage-badger
           - storage-dynamodb
-          - storage-gcs
           - storage-etcd
+          - storage-gcs
+          - storage-mongodb
           - storage-nats
+          - storage-postgres
+          - storage-redis
+          - storage-sqlite
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          cd contrib/${{ matrix.module }}
+          go test -race ./...
+
+  test-contrib-enhancements:
+    name: Test Enhancement Modules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - approval-slack
+          - dashboard
+          - distributed
+          - mcp
+          - otel
+          - planner-llm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          cd contrib/${{ matrix.module }}
+          go test -race ./...
+
+  test-contrib-packs:
+    name: Test Tool Packs
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          # Archive & Compression
+          - pack-archive
+          - pack-compression
+          # Text & String Processing
+          - pack-ascii
+          - pack-base64
+          - pack-case
+          - pack-diff
+          - pack-hash
+          - pack-markdown
+          - pack-pluralize
+          - pack-regex
+          - pack-similarity
+          - pack-slug
+          - pack-string
+          - pack-template
+          # Data Formats
+          - pack-html
+          - pack-json
+          - pack-xml
+          - pack-yaml
+          # Code & AST
+          - pack-ast
+          - pack-changelog
+          - pack-license
+          - pack-openapi
+          - pack-semver
+          # Utilities
+          - pack-cache
+          - pack-chunker
+          - pack-collection
+          - pack-color
+          - pack-config
+          - pack-convert
+          - pack-cron
+          - pack-env
+          - pack-math
+          - pack-path
+          - pack-prompt
+          - pack-random
+          - pack-rate
+          - pack-retry
+          - pack-scheduler
+          - pack-stats
+          - pack-time
+          - pack-uuid
+          - pack-validate
+          # Web & Network
+          - pack-browser
+          - pack-dns
+          - pack-graphql
+          - pack-grpc
           - pack-http
-          - pack-filesystem
-          - pack-shell
-          - pack-git
+          - pack-ip
+          - pack-sse
+          - pack-url
+          - pack-useragent
+          - pack-websocket
+          # Infrastructure
           - pack-cloud
           - pack-database
+          - pack-filesystem
+          - pack-fileops
+          - pack-git
           - pack-kubernetes
+          - pack-process
+          - pack-shell
+          - pack-sql
+          - pack-ssh
+          # Messaging & Notifications
+          - pack-email
           - pack-messaging
-          - pack-search
-          - pack-secrets
+          - pack-notification
+          - pack-slack
+          # AI & ML
           - pack-llm
           - pack-vectordb
+          - pack-tokenizer
+          # Media & Documents
+          - pack-chart
           - pack-image
-          - pack-monitoring
-          - pack-notification
-          - pack-email
           - pack-pdf
+          - pack-qrcode
+          - pack-spreadsheet
+          # Integrations
           - pack-copilot
-          - pack-fileops
-          - planner-llm
-          - dashboard
-          - mcp
-          - distributed
-          - approval-slack
-          - otel
+          - pack-github
+          - pack-jira
+          # Security & Crypto
+          - pack-crypto
+          - pack-jwt
+          - pack-password
+          - pack-secrets
+          # Data & Analytics
+          - pack-dataframe
+          - pack-finance
+          - pack-metrics
+          - pack-monitoring
+          - pack-search
+          # Geo & Localization
+          - pack-country
+          - pack-geo
+          - pack-phone
+          - pack-emoji
+          # Validation & Parsing
+          - pack-creditcard
+          - pack-fuzzy
+          - pack-mime
+          - pack-sysinfo
     steps:
       - uses: actions/checkout@v4
 

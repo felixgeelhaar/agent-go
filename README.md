@@ -203,13 +203,13 @@ engine, _ := agent.New(
 
 ### LLM Providers
 
-Pluggable providers for all major LLMs:
+Pluggable providers for all major LLMs (via contrib modules):
 
 ```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/anthropic"
-import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/openai"
-import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/gemini"
-import "github.com/felixgeelhaar/agent-go/infrastructure/planner/provider/ollama"
+import "github.com/felixgeelhaar/agent-go/contrib/planner-llm/providers/anthropic"
+import "github.com/felixgeelhaar/agent-go/contrib/planner-llm/providers/openai"
+import "github.com/felixgeelhaar/agent-go/contrib/planner-llm/providers/gemini"
+import "github.com/felixgeelhaar/agent-go/contrib/planner-llm/providers/ollama"
 
 // Each provider implements the same interface
 provider, _ := anthropic.New(anthropic.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")))
@@ -218,15 +218,15 @@ provider, _ := gemini.New(gemini.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
 provider, _ := ollama.New(ollama.WithBaseURL("http://localhost:11434"))
 ```
 
-### Domain Packs
+### Tool Packs
 
-Pre-built tool collections for common domains:
+Pre-built tool collections for common domains (94 packs available via contrib modules):
 
 ```go
-import "github.com/felixgeelhaar/agent-go/pack/database"
-import "github.com/felixgeelhaar/agent-go/pack/git"
-import "github.com/felixgeelhaar/agent-go/pack/kubernetes"
-import "github.com/felixgeelhaar/agent-go/pack/cloud"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-database"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-git"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-kubernetes"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-cloud"
 
 // Database: query, execute, schema inspection
 dbPack := database.New(db, database.WithMaxRows(1000))
@@ -241,19 +241,21 @@ k8sPack := kubernetes.New(client, kubernetes.WithNamespace("production"))
 cloudPack := cloud.New(provider, cloud.WithBucket("my-bucket"))
 ```
 
+**Categories**: Archive, Text Processing, Data Formats, Code Analysis, Utilities, Web & Network, Infrastructure, Messaging, AI & ML, Media & Documents, Integrations, Security, Data & Analytics, Geo & Localization, Validation & Parsing.
+
 ### Observability
 
-OpenTelemetry integration for traces and metrics:
+OpenTelemetry integration for traces and metrics (via contrib/otel):
 
 ```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/observability"
+import "github.com/felixgeelhaar/agent-go/contrib/otel"
 
-tracer, _ := observability.NewTracer("my-agent",
-    observability.WithOTLPEndpoint("localhost:4317"),
+tracer, _ := otel.NewTracer("my-agent",
+    otel.WithOTLPEndpoint("localhost:4317"),
 )
 
 engine, _ := agent.New(
-    agent.WithMiddleware(observability.TracingMiddleware(tracer)),
+    agent.WithMiddleware(otel.TracingMiddleware(tracer)),
 )
 
 // Automatic spans for: tool execution, state transitions, planner calls
@@ -262,40 +264,34 @@ engine, _ := agent.New(
 
 ### Security
 
-Input validation, secret management, and audit logging:
+Input validation, secret management, and audit logging (via contrib packs):
 
 ```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/security/validation"
-import "github.com/felixgeelhaar/agent-go/infrastructure/security/secrets"
-import "github.com/felixgeelhaar/agent-go/infrastructure/security/audit"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-validate"
+import "github.com/felixgeelhaar/agent-go/contrib/pack-secrets"
 
-// Validate tool inputs
-validator := validation.NewValidator(
-    validation.WithRule("path", validation.NoPathTraversal()),
-    validation.WithRule("query", validation.NoSQLInjection()),
+// Validate tool inputs with pack-validate
+validator := validate.NewValidator(
+    validate.WithRule("path", validate.NoPathTraversal()),
+    validate.WithRule("query", validate.NoSQLInjection()),
 )
 
-// Manage secrets
+// Manage secrets with pack-secrets
 secretMgr := secrets.NewEnvManager(secrets.WithPrefix("AGENT_"))
-
-// Audit all operations
-auditor := audit.NewLogger(audit.WithOutput(auditFile))
 ```
 
 ### Distributed Execution
 
-Scale across multiple workers:
+Scale across multiple workers (via contrib/distributed):
 
 ```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/distributed"
-import "github.com/felixgeelhaar/agent-go/infrastructure/distributed/queue"
-import "github.com/felixgeelhaar/agent-go/infrastructure/distributed/lock"
+import "github.com/felixgeelhaar/agent-go/contrib/distributed"
 
 // Create queue (memory for dev, Redis/NATS for prod)
-q := queue.NewMemoryQueue()
+q := distributed.NewMemoryQueue()
 
 // Create distributed lock
-l := lock.NewMemoryLock()
+l := distributed.NewMemoryLock()
 
 // Start workers
 worker := distributed.NewWorker(distributed.WorkerConfig{
@@ -312,6 +308,9 @@ worker.Start(ctx)
 
 ```
 agent-go/
+├── go.mod                     # Core module (lean dependencies)
+├── go.work                    # Go workspace file
+│
 ├── domain/                    # Core domain (no external deps)
 │   ├── agent/                 # Run, State, Decision, Evidence
 │   ├── tool/                  # Tool, Annotations, Schema, Registry
@@ -321,20 +320,22 @@ agent-go/
 ├── application/               # Orchestration
 │   └── engine.go              # Main engine service
 │
-├── infrastructure/            # Implementations
-│   ├── planner/provider/      # LLM providers
-│   ├── observability/         # OpenTelemetry
-│   ├── security/              # Validation, secrets, audit
-│   ├── distributed/           # Queues, locks, workers
+├── infrastructure/            # Core implementations
+│   ├── storage/memory/        # In-memory stores
+│   ├── planner/               # Mock & scripted planners
 │   └── resilience/            # Circuit breaker, retry
 │
 ├── interfaces/api/            # Public API
 │
-├── pack/                      # Domain tool packs
-│   ├── database/
-│   ├── git/
-│   ├── kubernetes/
-│   └── cloud/
+├── contrib/                   # Optional modules (separate go.mod each)
+│   ├── storage-*/             # Storage backends (postgres, redis, mongodb...)
+│   ├── pack-*/                # Tool packs (94 packs across 15 categories)
+│   ├── planner-llm/           # LLM providers (anthropic, openai, gemini...)
+│   ├── otel/                  # OpenTelemetry integration
+│   ├── distributed/           # Queues, locks, workers
+│   ├── mcp/                   # Model Context Protocol support
+│   ├── dashboard/             # Web dashboard
+│   └── approval-slack/        # Slack approval integration
 │
 └── example/                   # Examples
 ```
@@ -404,9 +405,16 @@ golangci-lint run ./...
 
 ## Dependencies
 
+**Core module** (lean, ~15 dependencies):
 - **[statekit](https://github.com/felixgeelhaar/statekit)** - Statechart execution engine
 - **[fortify](https://github.com/felixgeelhaar/fortify)** - Resilience patterns (circuit breaker, retry)
 - **[bolt](https://github.com/felixgeelhaar/bolt)** - High-performance structured logging
+- Standard library for everything else
+
+**Contrib modules** add dependencies only when imported:
+- Storage backends bring their drivers (pgx, mongo-driver, redis, etc.)
+- LLM providers bring their SDKs (anthropic-sdk, openai-sdk, etc.)
+- Tool packs bring domain-specific libraries as needed
 
 ---
 
