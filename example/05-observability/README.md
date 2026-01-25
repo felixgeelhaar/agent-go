@@ -43,10 +43,10 @@ Traces (viewable in Jaeger/Honeycomb/etc.):
 ### Basic Setup (stdout)
 
 ```go
-import "github.com/felixgeelhaar/agent-go/infrastructure/observability"
+import "github.com/felixgeelhaar/agent-go/contrib/otel"
 
-tracer, _ := observability.NewTracer("my-agent",
-    observability.WithServiceVersion("1.0.0"),
+tracer, _ := otel.NewTracer("my-agent",
+    otel.WithServiceVersion("1.0.0"),
 )
 defer tracer.Shutdown(ctx)
 ```
@@ -54,10 +54,10 @@ defer tracer.Shutdown(ctx)
 ### Production Setup (OTLP)
 
 ```go
-tracer, _ := observability.NewTracer("my-agent",
-    observability.WithOTLPEndpoint("localhost:4317"),
-    observability.WithServiceVersion("1.0.0"),
-    observability.WithEnvironment("production"),
+tracer, _ := otel.NewTracer("my-agent",
+    otel.WithOTLPEndpoint("localhost:4317"),
+    otel.WithServiceVersion("1.0.0"),
+    otel.WithEnvironment("production"),
 )
 ```
 
