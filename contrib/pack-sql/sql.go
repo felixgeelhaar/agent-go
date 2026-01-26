@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/felixgeelhaar/agent-go/domain/agent"
@@ -19,6 +20,36 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+// sqlIdentifierRegex validates SQL identifiers (table/column names).
+// Only allows alphanumeric characters and underscores, must start with letter or underscore.
+var sqlIdentifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// validateIdentifier checks if a string is a valid SQL identifier to prevent SQL injection.
+func validateIdentifier(name string) error {
+	if name == "" {
+		return fmt.Errorf("identifier cannot be empty")
+	}
+	if len(name) > 128 {
+		return fmt.Errorf("identifier too long (max 128 characters)")
+	}
+	if !sqlIdentifierRegex.MatchString(name) {
+		return fmt.Errorf("invalid identifier %q: must contain only alphanumeric characters and underscores, starting with a letter or underscore", name)
+	}
+	return nil
+}
+
+// quoteIdentifier wraps an identifier in quotes appropriate for the database driver.
+func (p *sqlPack) quoteIdentifier(name string) string {
+	switch p.cfg.Driver {
+	case "postgres", "pgx":
+		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	case "mysql":
+		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	default:
+		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	}
+}
 
 // Config holds database connection settings.
 type Config struct {
@@ -593,6 +624,11 @@ func (p *sqlPack) insertTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
+			// Validate table name to prevent SQL injection
+			if err := validateIdentifier(in.Table); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid table name: %w", err)
+			}
+
 			db, err := p.getDB()
 			if err != nil {
 				return tool.Result{}, err
@@ -605,7 +641,11 @@ func (p *sqlPack) insertTool() tool.Tool {
 
 			i := 1
 			for col, val := range in.Values {
-				columns = append(columns, col)
+				// Validate column name to prevent SQL injection
+				if err := validateIdentifier(col); err != nil {
+					return tool.Result{}, fmt.Errorf("invalid column name: %w", err)
+				}
+				columns = append(columns, p.quoteIdentifier(col))
 				values = append(values, val)
 				switch p.cfg.Driver {
 				case "postgres", "pgx":
@@ -616,8 +656,9 @@ func (p *sqlPack) insertTool() tool.Tool {
 				i++
 			}
 
-			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-				in.Table,
+			// Table and column names are validated above; placeholders use parameterized values
+			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", // #nosec G201 -- identifiers validated
+				p.quoteIdentifier(in.Table),
 				strings.Join(columns, ", "),
 				strings.Join(placeholders, ", "))
 
@@ -654,6 +695,11 @@ func (p *sqlPack) updateTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
+			// Validate table name to prevent SQL injection
+			if err := validateIdentifier(in.Table); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid table name: %w", err)
+			}
+
 			if in.Where == "" {
 				return tool.Result{}, fmt.Errorf("WHERE clause is required for UPDATE")
 			}
@@ -669,19 +715,25 @@ func (p *sqlPack) updateTool() tool.Tool {
 
 			i := 1
 			for col, val := range in.Set {
+				// Validate column name to prevent SQL injection
+				if err := validateIdentifier(col); err != nil {
+					return tool.Result{}, fmt.Errorf("invalid column name: %w", err)
+				}
+				quotedCol := p.quoteIdentifier(col)
 				switch p.cfg.Driver {
 				case "postgres", "pgx":
-					setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i))
+					setClauses = append(setClauses, fmt.Sprintf("%s = $%d", quotedCol, i))
 				default:
-					setClauses = append(setClauses, fmt.Sprintf("%s = ?", col))
+					setClauses = append(setClauses, fmt.Sprintf("%s = ?", quotedCol))
 				}
 				values = append(values, val)
 				i++
 			}
 			values = append(values, in.Params...)
 
-			query := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
-				in.Table,
+			// Table and column names validated; WHERE uses parameterized values via in.Params
+			query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", // #nosec G201 -- identifiers validated, WHERE uses params
+				p.quoteIdentifier(in.Table),
 				strings.Join(setClauses, ", "),
 				in.Where)
 
@@ -715,6 +767,11 @@ func (p *sqlPack) deleteTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
+			// Validate table name to prevent SQL injection
+			if err := validateIdentifier(in.Table); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid table name: %w", err)
+			}
+
 			if in.Where == "" {
 				return tool.Result{}, fmt.Errorf("WHERE clause is required for DELETE")
 			}
@@ -724,7 +781,8 @@ func (p *sqlPack) deleteTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
-			query := fmt.Sprintf("DELETE FROM %s WHERE %s", in.Table, in.Where)
+			// Table name validated; WHERE uses parameterized values via in.Params
+			query := fmt.Sprintf("DELETE FROM %s WHERE %s", p.quoteIdentifier(in.Table), in.Where) // #nosec G201 -- table validated, WHERE uses params
 
 			result, err := db.ExecContext(ctx, query, in.Params...)
 			if err != nil {
@@ -757,12 +815,18 @@ func (p *sqlPack) countTool() tool.Tool {
 				return tool.Result{}, err
 			}
 
+			// Validate table name to prevent SQL injection
+			if err := validateIdentifier(in.Table); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid table name: %w", err)
+			}
+
 			db, err := p.getDB()
 			if err != nil {
 				return tool.Result{}, err
 			}
 
-			query := fmt.Sprintf("SELECT COUNT(*) FROM %s", in.Table)
+			// Table name validated; WHERE uses parameterized values via in.Params
+			query := fmt.Sprintf("SELECT COUNT(*) FROM %s", p.quoteIdentifier(in.Table)) // #nosec G201 -- table validated
 			if in.Where != "" {
 				query += " WHERE " + in.Where
 			}
