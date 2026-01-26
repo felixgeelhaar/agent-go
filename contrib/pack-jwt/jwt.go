@@ -496,7 +496,6 @@ func checkExpTool() tool.Tool {
 			var payload map[string]any
 			json.Unmarshal(payloadJSON, &payload)
 
-			now := time.Now()
 			buffer := time.Duration(params.Buffer) * time.Second
 
 			expired := false
