@@ -298,7 +298,7 @@ func (p *spreadsheetPack) appendCSVTool() tool.Tool {
 				}
 			}
 
-			file, err := os.OpenFile(params.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			file, err := os.OpenFile(params.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to open file: %w", err)
 			}
@@ -614,7 +614,7 @@ func (p *spreadsheetPack) writeExcelTool() tool.Tool {
 			if len(params.Headers) > 0 {
 				for col, header := range params.Headers {
 					cell, _ := excelize.CoordinatesToCellName(col+1, rowNum)
-					f.SetCellValue(sheet, cell, header)
+					_ = f.SetCellValue(sheet, cell, header) // #nosec G104 -- best-effort write, errors handled at save
 				}
 				rowNum++
 			}
@@ -625,7 +625,7 @@ func (p *spreadsheetPack) writeExcelTool() tool.Tool {
 				case []interface{}:
 					for col, val := range v {
 						cell, _ := excelize.CoordinatesToCellName(col+1, rowNum)
-						f.SetCellValue(sheet, cell, val)
+						_ = f.SetCellValue(sheet, cell, val) // #nosec G104 -- best-effort write, errors handled at save
 					}
 				case map[string]interface{}:
 					if len(params.Headers) == 0 {
@@ -634,14 +634,14 @@ func (p *spreadsheetPack) writeExcelTool() tool.Tool {
 						}
 						for col, header := range params.Headers {
 							cell, _ := excelize.CoordinatesToCellName(col+1, 1)
-							f.SetCellValue(sheet, cell, header)
+							_ = f.SetCellValue(sheet, cell, header) // #nosec G104 -- best-effort write, errors handled at save
 						}
 						rowNum = 2
 					}
 					for col, h := range params.Headers {
 						if val, ok := v[h]; ok {
 							cell, _ := excelize.CoordinatesToCellName(col+1, rowNum)
-							f.SetCellValue(sheet, cell, val)
+							_ = f.SetCellValue(sheet, cell, val) // #nosec G104 -- best-effort write, errors handled at save
 						}
 					}
 				}

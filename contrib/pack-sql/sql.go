@@ -876,7 +876,7 @@ func (p *sqlPack) transactionTool() tool.Tool {
 			for i, stmt := range in.Statements {
 				result, err := tx.ExecContext(ctx, stmt.Query, stmt.Params...)
 				if err != nil {
-					tx.Rollback()
+					_ = tx.Rollback() // #nosec G104 -- best-effort rollback, original error takes precedence
 					return tool.Result{}, fmt.Errorf("statement %d failed: %w", i, err)
 				}
 

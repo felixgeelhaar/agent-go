@@ -415,7 +415,7 @@ func detectTool() tool.Tool {
 					// Try deflate
 					reader := flate.NewReader(bytes.NewReader(data))
 					_, err := io.ReadAll(reader)
-					reader.Close()
+					_ = reader.Close() // #nosec G104 -- best-effort close
 					if err == nil {
 						format = "deflate"
 						valid = true

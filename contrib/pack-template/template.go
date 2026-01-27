@@ -237,7 +237,7 @@ func (p *templatePack) renderFileTool() tool.Tool {
 			}
 
 			if params.Output != "" {
-				if err := os.WriteFile(params.Output, buf.Bytes(), 0644); err != nil {
+				if err := os.WriteFile(params.Output, buf.Bytes(), 0600); err != nil {
 					return tool.Result{}, fmt.Errorf("failed to write output: %w", err)
 				}
 			}

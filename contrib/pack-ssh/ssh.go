@@ -106,7 +106,7 @@ func connectTool() tool.Tool {
 						home, _ := os.UserHomeDir()
 						keyPath = filepath.Join(home, keyPath[1:])
 					}
-					keyData, err = os.ReadFile(keyPath)
+					keyData, err = os.ReadFile(keyPath) // #nosec G304 -- intentional file read for SSH key tool
 					if err != nil {
 						return tool.Result{}, err
 					}
@@ -139,7 +139,7 @@ func connectTool() tool.Tool {
 
 			pool.mu.Lock()
 			if existing, ok := pool.conns[id]; ok {
-				existing.Close()
+				_ = existing.Close() // #nosec G104 -- best-effort close of existing connection
 			}
 			pool.conns[id] = client
 			pool.mu.Unlock()
@@ -171,7 +171,7 @@ func disconnectTool() tool.Tool {
 			pool.mu.Lock()
 			client, ok := pool.conns[params.ID]
 			if ok {
-				client.Close()
+				_ = client.Close() // #nosec G104 -- best-effort close
 				delete(pool.conns, params.ID)
 			}
 			pool.mu.Unlock()
@@ -299,7 +299,7 @@ func shellTool() tool.Tool {
 					"exit_code": exitCode,
 				})
 
-				session.Close()
+				_ = session.Close() // #nosec G104 -- best-effort close
 			}
 
 			result := map[string]any{
@@ -361,9 +361,9 @@ func scpUploadTool() tool.Tool {
 			// SCP protocol
 			go func() {
 				w, _ := session.StdinPipe()
-				defer w.Close()
+				defer func() { _ = w.Close() }() // #nosec G104 -- best-effort close
 				fmt.Fprintf(w, "C0644 %d %s\n", len(data), filepath.Base(params.RemotePath))
-				w.Write(data)
+				_, _ = w.Write(data) // #nosec G104 -- write error handled by session.Run
 				fmt.Fprint(w, "\x00")
 			}()
 
@@ -428,7 +428,7 @@ func scpDownloadTool() tool.Tool {
 			content := stdout.Bytes()
 
 			if params.LocalPath != "" {
-				err = os.WriteFile(params.LocalPath, content, 0644)
+				err = os.WriteFile(params.LocalPath, content, 0600) // #nosec G306 -- restrictive permissions for downloaded files
 				if err != nil {
 					return tool.Result{}, err
 				}
@@ -494,7 +494,7 @@ func tunnelTool() tool.Tool {
 
 					remote, err := client.Dial("tcp", remoteAddr)
 					if err != nil {
-						local.Close()
+						_ = local.Close() // #nosec G104 -- best-effort close on dial failure
 						continue
 					}
 
@@ -510,7 +510,7 @@ func tunnelTool() tool.Tool {
 								if err != nil {
 									return
 								}
-								remote.Write(buf[:n])
+								_, _ = remote.Write(buf[:n]) // #nosec G104 -- best-effort tunnel write
 							}
 						}()
 
@@ -520,7 +520,7 @@ func tunnelTool() tool.Tool {
 							if err != nil {
 								return
 							}
-							local.Write(buf[:n])
+							_, _ = local.Write(buf[:n]) // #nosec G104 -- best-effort tunnel write
 						}
 					}()
 				}
@@ -569,7 +569,7 @@ func closeAllTool() tool.Tool {
 			pool.mu.Lock()
 			count := len(pool.conns)
 			for id, client := range pool.conns {
-				client.Close()
+				_ = client.Close() // #nosec G104 -- best-effort close
 				delete(pool.conns, id)
 			}
 			pool.mu.Unlock()
@@ -688,7 +688,7 @@ func hostKeyTool() tool.Tool {
 			addr := fmt.Sprintf("%s:%d", params.Host, port)
 			conn, err := ssh.Dial("tcp", addr, config)
 			if conn != nil {
-				conn.Close()
+				_ = conn.Close() // #nosec G104 -- best-effort close
 			}
 
 			// We expect an error (no auth), but we captured the host key

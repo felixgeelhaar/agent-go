@@ -188,9 +188,9 @@ func shuffleTool() tool.Tool {
 
 			var rng *rand.Rand
 			if params.Seed != 0 {
-				rng = rand.New(rand.NewSource(params.Seed))
+				rng = rand.New(rand.NewSource(params.Seed)) // #nosec G404 -- math/rand sufficient for shuffling
 			} else {
-				rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+				rng = rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404 -- math/rand sufficient for shuffling
 			}
 
 			rng.Shuffle(len(shuffled), func(i, j int) {
@@ -231,9 +231,9 @@ func sampleTool() tool.Tool {
 
 			var rng *rand.Rand
 			if params.Seed != 0 {
-				rng = rand.New(rand.NewSource(params.Seed))
+				rng = rand.New(rand.NewSource(params.Seed)) // #nosec G404 -- math/rand sufficient for sampling
 			} else {
-				rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+				rng = rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404 -- math/rand sufficient for sampling
 			}
 
 			// Fisher-Yates partial shuffle

@@ -85,7 +85,7 @@ func connectTool() tool.Tool {
 
 			pool.mu.Lock()
 			if existing, ok := pool.conns[id]; ok {
-				existing.Close()
+				_ = existing.Close() // #nosec G104 -- best-effort close
 			}
 			pool.conns[id] = conn
 			pool.mu.Unlock()
@@ -116,8 +116,8 @@ func disconnectTool() tool.Tool {
 			pool.mu.Lock()
 			conn, ok := pool.conns[params.ID]
 			if ok {
-				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				conn.Close()
+				_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")) // #nosec G104 -- best-effort close message
+				_ = conn.Close()                                                                                              // #nosec G104 -- best-effort close
 				delete(pool.conns, params.ID)
 			}
 			pool.mu.Unlock()
@@ -203,9 +203,9 @@ func receiveTool() tool.Tool {
 				timeout = 30 * time.Second
 			}
 
-			conn.SetReadDeadline(time.Now().Add(timeout))
+			_ = conn.SetReadDeadline(time.Now().Add(timeout)) // #nosec G104 -- best-effort deadline
 			messageType, message, err := conn.ReadMessage()
-			conn.SetReadDeadline(time.Time{})
+			_ = conn.SetReadDeadline(time.Time{}) // #nosec G104 -- best-effort deadline clear
 
 			if err != nil {
 				return tool.Result{}, err
@@ -301,10 +301,10 @@ func receiveJSONTool() tool.Tool {
 				timeout = 30 * time.Second
 			}
 
-			conn.SetReadDeadline(time.Now().Add(timeout))
+			_ = conn.SetReadDeadline(time.Now().Add(timeout)) // #nosec G104 -- best-effort deadline
 			var data map[string]any
 			err := conn.ReadJSON(&data)
-			conn.SetReadDeadline(time.Time{})
+			_ = conn.SetReadDeadline(time.Time{}) // #nosec G104 -- best-effort deadline clear
 
 			if err != nil {
 				return tool.Result{}, err
@@ -415,8 +415,8 @@ func closeAllTool() tool.Tool {
 			pool.mu.Lock()
 			count := len(pool.conns)
 			for id, conn := range pool.conns {
-				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				conn.Close()
+				_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")) // #nosec G104 -- best-effort close message
+				_ = conn.Close()                                                                                              // #nosec G104 -- best-effort close
 				delete(pool.conns, id)
 			}
 			pool.mu.Unlock()
@@ -470,9 +470,9 @@ func sendReceiveTool() tool.Tool {
 			}
 
 			// Receive
-			conn.SetReadDeadline(time.Now().Add(timeout))
+			_ = conn.SetReadDeadline(time.Now().Add(timeout)) // #nosec G104 -- best-effort deadline
 			_, response, err := conn.ReadMessage()
-			conn.SetReadDeadline(time.Time{})
+			_ = conn.SetReadDeadline(time.Time{}) // #nosec G104 -- best-effort deadline clear
 
 			if err != nil {
 				return tool.Result{}, err

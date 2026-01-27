@@ -34,6 +34,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 )
@@ -132,7 +133,16 @@ func (s *Server) serveHTTP() error {
 	mux.HandleFunc("/mcp/prompts/list", s.handleListPrompts)
 	mux.HandleFunc("/mcp/prompts/get", s.handleGetPrompt)
 
-	return http.ListenAndServe(s.config.Address, mux)
+	server := &http.Server{
+		Addr:              s.config.Address,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }
 
 // handleInitialize handles the initialize request.
