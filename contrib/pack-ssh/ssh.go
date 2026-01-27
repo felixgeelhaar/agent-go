@@ -127,7 +127,7 @@ func connectTool() tool.Tool {
 			config := &ssh.ClientConfig{
 				User:            params.User,
 				Auth:            authMethods,
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- intentional for tool flexibility; users should provide known_hosts in production
 				Timeout:         timeout,
 			}
 
@@ -677,6 +677,7 @@ func hostKeyTool() tool.Tool {
 
 			var hostKey ssh.PublicKey
 			config := &ssh.ClientConfig{
+				// #nosec G106 -- intentional to capture host key before verification
 				HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 					hostKey = key
 					return nil

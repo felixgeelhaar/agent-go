@@ -531,11 +531,6 @@ func reverseDNSTool() tool.Tool {
 			var reverseDNS string
 			if ip4 := ip.To4(); ip4 != nil {
 				// IPv4 reverse DNS
-				reverseDNS = strings.Join([]string{
-					string(rune('0' + ip4[3]/100%10)),
-					string(rune('0' + ip4[3]/10%10)),
-					string(rune('0' + ip4[3]%10)),
-				}, "")
 				parts := make([]string, 4)
 				for i := 0; i < 4; i++ {
 					parts[3-i] = net.IP{ip4[i]}.String()

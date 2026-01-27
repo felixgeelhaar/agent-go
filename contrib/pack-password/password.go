@@ -393,19 +393,7 @@ func entropyTool() tool.Tool {
 			}
 
 			// Entropy = log2(charset^length) = length * log2(charset)
-			var entropy float64
-			if charsetSize > 0 {
-				entropy = float64(len(password)) * (1.0 / 0.693147) * float64(len(string(rune(charsetSize))))
-				// More accurate calculation
-				import_log := 0.0
-				for i := charsetSize; i > 1; i /= 2 {
-					import_log += 1
-				}
-				entropy = float64(len(password)) * import_log
-			}
-
-			// Simple entropy calculation
-			entropy = float64(len(password)) * bitsPerChar(charsetSize)
+			entropy := float64(len(password)) * bitsPerChar(charsetSize)
 
 			var strength string
 			switch {

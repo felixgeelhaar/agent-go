@@ -310,9 +310,14 @@ func inspectTool() tool.Tool {
 			json.Unmarshal(headerJSON, &header)
 
 			// Decode payload
-			payloadJSON, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload encoding: %w", err)
+			}
 			var payload map[string]any
-			json.Unmarshal(payloadJSON, &payload)
+			if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload JSON: %w", err)
+			}
 
 			// Time-related claims
 			var issuedAt, expiresAt, notBefore *time.Time
@@ -492,9 +497,14 @@ func checkExpTool() tool.Tool {
 				return tool.Result{}, fmt.Errorf("invalid JWT format")
 			}
 
-			payloadJSON, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload encoding: %w", err)
+			}
 			var payload map[string]any
-			json.Unmarshal(payloadJSON, &payload)
+			if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload JSON: %w", err)
+			}
 
 			buffer := time.Duration(params.Buffer) * time.Second
 
@@ -543,9 +553,14 @@ func extractClaimTool() tool.Tool {
 				return tool.Result{}, fmt.Errorf("invalid JWT format")
 			}
 
-			payloadJSON, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload encoding: %w", err)
+			}
 			var payload map[string]any
-			json.Unmarshal(payloadJSON, &payload)
+			if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+				return tool.Result{}, fmt.Errorf("invalid JWT payload JSON: %w", err)
+			}
 
 			value, exists := payload[params.Claim]
 

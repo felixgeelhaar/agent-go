@@ -211,9 +211,9 @@ func uuidTool() tool.Tool {
 			version := 0
 
 			if valid {
-				// Extract version from position 14
-				v, _ := strconv.ParseInt(string(params.UUID[14]), 16, 64)
-				version = int(v)
+				// Extract version from position 14 (single hex digit, always 0-15)
+				v, _ := strconv.ParseUint(string(params.UUID[14]), 16, 8)
+				version = int(v) // #nosec G115 -- value is a single hex digit (0-15)
 
 				if params.Version != 0 && params.Version != version {
 					valid = false

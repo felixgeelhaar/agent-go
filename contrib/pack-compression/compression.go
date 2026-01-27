@@ -75,7 +75,13 @@ func gzipCompressTool() tool.Tool {
 				output, _ := json.Marshal(result)
 				return tool.Result{Output: output}, nil
 			}
-			writer.Close()
+			if err := writer.Close(); err != nil {
+				result := map[string]any{
+					"error": err.Error(),
+				}
+				output, _ := json.Marshal(result)
+				return tool.Result{Output: output}, nil
+			}
 
 			compressed := buf.Bytes()
 			encoded := base64.StdEncoding.EncodeToString(compressed)
@@ -183,7 +189,13 @@ func zlibCompressTool() tool.Tool {
 				output, _ := json.Marshal(result)
 				return tool.Result{Output: output}, nil
 			}
-			writer.Close()
+			if err := writer.Close(); err != nil {
+				result := map[string]any{
+					"error": err.Error(),
+				}
+				output, _ := json.Marshal(result)
+				return tool.Result{Output: output}, nil
+			}
 
 			compressed := buf.Bytes()
 			encoded := base64.StdEncoding.EncodeToString(compressed)
@@ -291,7 +303,13 @@ func deflateCompressTool() tool.Tool {
 				output, _ := json.Marshal(result)
 				return tool.Result{Output: output}, nil
 			}
-			writer.Close()
+			if err := writer.Close(); err != nil {
+				result := map[string]any{
+					"error": err.Error(),
+				}
+				output, _ := json.Marshal(result)
+				return tool.Result{Output: output}, nil
+			}
 
 			compressed := buf.Bytes()
 			encoded := base64.StdEncoding.EncodeToString(compressed)
@@ -477,22 +495,22 @@ func compareTool() tool.Tool {
 			// Try gzip
 			var gzipBuf bytes.Buffer
 			gzipWriter := gzip.NewWriter(&gzipBuf)
-			gzipWriter.Write([]byte(params.Data))
-			gzipWriter.Close()
+			_, _ = gzipWriter.Write([]byte(params.Data)) // #nosec G104 -- comparison tool, errors don't affect result validity
+			_ = gzipWriter.Close()                       // #nosec G104
 			gzipSize := gzipBuf.Len()
 
 			// Try zlib
 			var zlibBuf bytes.Buffer
 			zlibWriter := zlib.NewWriter(&zlibBuf)
-			zlibWriter.Write([]byte(params.Data))
-			zlibWriter.Close()
+			_, _ = zlibWriter.Write([]byte(params.Data)) // #nosec G104 -- comparison tool, errors don't affect result validity
+			_ = zlibWriter.Close()                       // #nosec G104
 			zlibSize := zlibBuf.Len()
 
 			// Try deflate
 			var deflateBuf bytes.Buffer
 			deflateWriter, _ := flate.NewWriter(&deflateBuf, flate.DefaultCompression)
-			deflateWriter.Write([]byte(params.Data))
-			deflateWriter.Close()
+			_, _ = deflateWriter.Write([]byte(params.Data)) // #nosec G104 -- comparison tool, errors don't affect result validity
+			_ = deflateWriter.Close()                       // #nosec G104
 			deflateSize := deflateBuf.Len()
 
 			// Find best
@@ -561,22 +579,22 @@ func benchmarkTool() tool.Tool {
 					var w *gzip.Writer
 					w, err = gzip.NewWriterLevel(&buf, level)
 					if err == nil {
-						w.Write([]byte(params.Data))
-						w.Close()
+						_, _ = w.Write([]byte(params.Data)) // #nosec G104 -- benchmark tool, errors don't affect result validity
+						_ = w.Close()                       // #nosec G104
 					}
 				case "zlib":
 					var w *zlib.Writer
 					w, err = zlib.NewWriterLevel(&buf, level)
 					if err == nil {
-						w.Write([]byte(params.Data))
-						w.Close()
+						_, _ = w.Write([]byte(params.Data)) // #nosec G104 -- benchmark tool, errors don't affect result validity
+						_ = w.Close()                       // #nosec G104
 					}
 				case "deflate":
 					var w *flate.Writer
 					w, err = flate.NewWriter(&buf, level)
 					if err == nil {
-						w.Write([]byte(params.Data))
-						w.Close()
+						_, _ = w.Write([]byte(params.Data)) // #nosec G104 -- benchmark tool, errors don't affect result validity
+						_ = w.Close()                       // #nosec G104
 					}
 				}
 

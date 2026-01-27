@@ -569,11 +569,12 @@ func hexToRGB(hex string) (int, int, int, error) {
 		return 0, 0, 0, fmt.Errorf("invalid hex color")
 	}
 
-	r, _ := strconv.ParseInt(hex[0:2], 16, 64)
-	g, _ := strconv.ParseInt(hex[2:4], 16, 64)
-	b, _ := strconv.ParseInt(hex[4:6], 16, 64)
+	// Parse hex color components (each is 0-255)
+	r, _ := strconv.ParseUint(hex[0:2], 16, 8)
+	g, _ := strconv.ParseUint(hex[2:4], 16, 8)
+	b, _ := strconv.ParseUint(hex[4:6], 16, 8)
 
-	return int(r), int(g), int(b), nil
+	return int(r), int(g), int(b), nil // #nosec G115 -- values are hex color components (0-255)
 }
 
 func normalizeHex(hex string) string {
