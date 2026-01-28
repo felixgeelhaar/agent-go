@@ -3,6 +3,7 @@ package filesystem
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -473,6 +474,172 @@ func TestGenerateArtifactID(t *testing.T) {
 	if id1 == id2 {
 		t.Error("generateArtifactID() should return unique IDs")
 	}
+}
+
+func TestNewArtifactStore_InvalidPath(t *testing.T) {
+	t.Parallel()
+
+	// Use a path under a file (not a directory) to force MkdirAll to fail.
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "afile")
+	if err := os.WriteFile(filePath, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	invalidPath := filepath.Join(filePath, "subdir")
+
+	_, err := NewArtifactStore(invalidPath)
+	if err == nil {
+		t.Fatal("expected error when base path cannot be created")
+	}
+	if !strings.Contains(err.Error(), "failed to create artifact directory") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestArtifactStore_Store_MkdirAllError(t *testing.T) {
+	t.Parallel()
+
+	// Create store, then make basePath read-only so artifact subdirectory creation fails.
+	tempDir := t.TempDir()
+	store, err := NewArtifactStore(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove write permission on the basePath.
+	if err := os.Chmod(tempDir, 0500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(tempDir, 0750) })
+
+	ctx := context.Background()
+	_, err = store.Store(ctx, strings.NewReader("data"), artifact.DefaultStoreOptions())
+	if err == nil {
+		t.Fatal("expected error when artifact directory cannot be created")
+	}
+	if !strings.Contains(err.Error(), "failed to create artifact path") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestArtifactStore_Store_CopyError(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	store, err := NewArtifactStore(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	// Use a reader that returns an error during read.
+	_, err = store.Store(ctx, &errorReader{}, artifact.DefaultStoreOptions())
+	if err == nil {
+		t.Fatal("expected error when content read fails")
+	}
+	if !strings.Contains(err.Error(), "failed to write content") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestArtifactStore_Store_EmptyContent(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	store, _ := NewArtifactStore(tempDir)
+	ctx := context.Background()
+
+	ref, err := store.Store(ctx, strings.NewReader(""), artifact.DefaultStoreOptions())
+	if err != nil {
+		t.Fatalf("Store() error = %v", err)
+	}
+	if ref.Size != 0 {
+		t.Errorf("Size = %d, want 0", ref.Size)
+	}
+}
+
+func TestArtifactStore_Store_LargeContent(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	store, _ := NewArtifactStore(tempDir)
+	ctx := context.Background()
+
+	// 1MB of data
+	data := bytes.Repeat([]byte("A"), 1<<20)
+	ref, err := store.Store(ctx, bytes.NewReader(data), artifact.DefaultStoreOptions().WithName("large.bin"))
+	if err != nil {
+		t.Fatalf("Store() error = %v", err)
+	}
+	if ref.Size != int64(len(data)) {
+		t.Errorf("Size = %d, want %d", ref.Size, len(data))
+	}
+
+	// Verify roundtrip
+	reader, err := store.Retrieve(ctx, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	got, _ := io.ReadAll(reader)
+	if !bytes.Equal(got, data) {
+		t.Error("retrieved content does not match stored content")
+	}
+}
+
+func TestArtifactStore_Store_NoName(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	store, _ := NewArtifactStore(tempDir)
+	ctx := context.Background()
+
+	opts := artifact.StoreOptions{
+		ContentType:     "text/plain",
+		ComputeChecksum: true,
+	}
+	ref, err := store.Store(ctx, strings.NewReader("content"), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref.Name != "" {
+		t.Errorf("expected empty name, got %q", ref.Name)
+	}
+}
+
+func TestArtifactStore_Metadata_CorruptedJSON(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	store, _ := NewArtifactStore(tempDir)
+	ctx := context.Background()
+
+	// Store a valid artifact first.
+	ref, err := store.Store(ctx, strings.NewReader("content"), artifact.DefaultStoreOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Corrupt the metadata file.
+	metaPath := filepath.Join(tempDir, ref.ID, "metadata.json")
+	if err := os.WriteFile(metaPath, []byte("not json{{{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = store.Metadata(ctx, ref)
+	if err == nil {
+		t.Fatal("expected error for corrupted metadata")
+	}
+	if !strings.Contains(err.Error(), "failed to decode metadata") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// errorReader is an io.Reader that always returns an error.
+type errorReader struct{}
+
+func (e *errorReader) Read(_ []byte) (int, error) {
+	return 0, errors.New("simulated read error")
 }
 
 func TestRandomString(t *testing.T) {

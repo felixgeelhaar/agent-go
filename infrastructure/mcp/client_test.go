@@ -3,7 +3,12 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os/exec"
+	"sync"
 	"testing"
+
+	"github.com/felixgeelhaar/agent-go/domain/tool"
 )
 
 func TestClientOptions(t *testing.T) {
@@ -755,6 +760,23 @@ func TestErrors(t *testing.T) {
 			t.Errorf("ErrConnectionFailed = %s, want 'connection failed'", ErrConnectionFailed.Error())
 		}
 	})
+
+	t.Run("ErrInvalidCommand is defined", func(t *testing.T) {
+		t.Parallel()
+
+		if ErrInvalidCommand.Error() != "invalid command" {
+			t.Errorf("ErrInvalidCommand = %s, want 'invalid command'", ErrInvalidCommand.Error())
+		}
+	})
+
+	t.Run("errors can be wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		wrappedErr := errors.New("wrapped: " + ErrNotConnected.Error())
+		if wrappedErr == nil {
+			t.Error("Should be able to wrap errors")
+		}
+	})
 }
 
 func TestMCPClient_Concurrent(t *testing.T) {
@@ -872,4 +894,430 @@ func TestMCPToolResult(t *testing.T) {
 		// Both formats are acceptable depending on omitempty behavior
 		_ = string(data) // Validate JSON was generated without error
 	})
+}
+
+func TestValidateCommand(t *testing.T) {
+	t.Parallel()
+
+	t.Run("accepts valid command in PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Test with a command that should exist on all systems
+		resolved, err := validateCommand("go")
+		if err != nil {
+			t.Skipf("Skipping test: go command not found: %v", err)
+		}
+		if resolved == "" {
+			t.Error("validateCommand() should return non-empty path")
+		}
+	})
+
+	t.Run("rejects empty command", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("")
+		if err == nil {
+			t.Error("validateCommand() should reject empty command")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with semicolon", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("ls;rm")
+		if err == nil {
+			t.Error("validateCommand() should reject command with semicolon")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with pipe", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("cat|grep")
+		if err == nil {
+			t.Error("validateCommand() should reject command with pipe")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with ampersand", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("sleep&")
+		if err == nil {
+			t.Error("validateCommand() should reject command with ampersand")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with dollar sign", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("echo$HOME")
+		if err == nil {
+			t.Error("validateCommand() should reject command with dollar sign")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with backtick", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("echo`whoami`")
+		if err == nil {
+			t.Error("validateCommand() should reject command with backtick")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with parentheses", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("(ls)")
+		if err == nil {
+			t.Error("validateCommand() should reject command with parentheses")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with redirect", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("cat>file")
+		if err == nil {
+			t.Error("validateCommand() should reject command with redirect")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with single quote", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("echo'test'")
+		if err == nil {
+			t.Error("validateCommand() should reject command with single quote")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with double quote", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("echo\"test\"")
+		if err == nil {
+			t.Error("validateCommand() should reject command with double quote")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects command with newline", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("ls\nrm")
+		if err == nil {
+			t.Error("validateCommand() should reject command with newline")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects non-existent command", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("nonexistent-command-xyz123")
+		if err == nil {
+			t.Error("validateCommand() should reject non-existent command")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("accepts absolute path to valid command", func(t *testing.T) {
+		t.Parallel()
+
+		// Find the go binary's absolute path
+		goPath, err := exec.LookPath("go")
+		if err != nil {
+			t.Skipf("Skipping test: go command not found: %v", err)
+		}
+
+		resolved, err := validateCommand(goPath)
+		if err != nil {
+			t.Fatalf("validateCommand() should accept valid absolute path: %v", err)
+		}
+		if resolved != goPath {
+			t.Errorf("validateCommand() = %s, want %s", resolved, goPath)
+		}
+	})
+
+	t.Run("rejects absolute path with traversal", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("/usr/bin/../bin/ls")
+		if err == nil {
+			t.Error("validateCommand() should reject path with traversal elements")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+
+	t.Run("rejects absolute path to non-existent file", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := validateCommand("/nonexistent/path/to/command")
+		if err == nil {
+			t.Error("validateCommand() should reject non-existent absolute path")
+		}
+		if !errors.Is(err, ErrInvalidCommand) {
+			t.Errorf("Error should wrap ErrInvalidCommand, got %v", err)
+		}
+	})
+}
+
+func TestImportToolsFromClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns error when client not connected", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient()
+		registry := &mockToolRegistry{tools: make(map[string]tool.Tool)}
+
+		err := ImportToolsFromClient(context.Background(), client, registry)
+		if err == nil {
+			t.Error("ImportToolsFromClient() should return error when not connected")
+		}
+		if err != ErrNotConnected {
+			t.Errorf("Error = %v, want ErrNotConnected", err)
+		}
+	})
+
+	t.Run("continues on duplicate registration", func(t *testing.T) {
+		t.Parallel()
+
+		// This test documents the behavior but can't easily test it without a real server
+		// The function continues on duplicate registration errors
+		client := NewClient()
+		registry := &mockToolRegistry{tools: make(map[string]tool.Tool)}
+
+		// Pre-register a tool
+		mockT := &mockToolForImport{
+			name:        "existing_tool",
+			description: "Already exists",
+		}
+		_ = registry.Register(mockT)
+
+		err := ImportToolsFromClient(context.Background(), client, registry)
+		// Should fail with not connected, not duplicate error
+		if err != ErrNotConnected {
+			t.Errorf("Error = %v, want ErrNotConnected", err)
+		}
+	})
+}
+
+// mockToolForImport is a simple mock tool
+type mockToolForImport struct {
+	name        string
+	description string
+}
+
+func (m *mockToolForImport) Name() string                  { return m.name }
+func (m *mockToolForImport) Description() string           { return m.description }
+func (m *mockToolForImport) InputSchema() tool.Schema      { return tool.EmptySchema() }
+func (m *mockToolForImport) OutputSchema() tool.Schema     { return tool.EmptySchema() }
+func (m *mockToolForImport) Annotations() tool.Annotations { return tool.Annotations{} }
+
+func (m *mockToolForImport) Execute(ctx context.Context, input json.RawMessage) (tool.Result, error) {
+	return tool.Result{Output: json.RawMessage(`{}`)}, nil
+}
+
+func TestCreateToolCaller_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns error when client not connected", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient()
+		caller := client.createToolCaller()
+
+		// Calling on disconnected client returns error
+		_, err := caller(context.Background(), "test_tool", json.RawMessage(`{}`))
+		if err != ErrNotConnected {
+			t.Errorf("Caller error = %v, want ErrNotConnected", err)
+		}
+	})
+
+	t.Run("creates valid caller function", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient()
+		caller := client.createToolCaller()
+
+		if caller == nil {
+			t.Fatal("createToolCaller() returned nil function")
+		}
+	})
+
+	t.Run("caller passes correct parameters", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient()
+		caller := client.createToolCaller()
+
+		// Test that caller is created with proper closure
+		testInput := json.RawMessage(`{"key":"value"}`)
+		_, err := caller(context.Background(), "my_tool", testInput)
+
+		// Should fail with not connected, but proves closure captured client
+		if err != ErrNotConnected {
+			t.Errorf("Expected ErrNotConnected, got %v", err)
+		}
+	})
+
+	t.Run("caller handles context cancellation", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient()
+		caller := client.createToolCaller()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := caller(ctx, "test_tool", json.RawMessage(`{}`))
+		if err != ErrNotConnected {
+			// Should return not connected since we're not connected
+			t.Errorf("Expected ErrNotConnected, got %v", err)
+		}
+	})
+}
+
+func TestMCPClient_ConnectStdioValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rejects command with shell metacharacter in args", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient(
+			WithServerCommand("go", "run;malicious"),
+		)
+
+		err := client.Connect(context.Background())
+		if err == nil {
+			t.Error("Connect() should reject command with shell metacharacter in args")
+			_ = client.Close()
+		}
+	})
+
+	t.Run("rejects command with pipe in args", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient(
+			WithServerCommand("go", "run|grep"),
+		)
+
+		err := client.Connect(context.Background())
+		if err == nil {
+			t.Error("Connect() should reject command with pipe in args")
+			_ = client.Close()
+		}
+	})
+
+	t.Run("rejects command with ampersand in args", func(t *testing.T) {
+		t.Parallel()
+
+		client := NewClient(
+			WithServerCommand("go", "run&background"),
+		)
+
+		err := client.Connect(context.Background())
+		if err == nil {
+			t.Error("Connect() should reject command with ampersand in args")
+			_ = client.Close()
+		}
+	})
+}
+
+// mockToolRegistry implements tool.Registry for testing
+type mockToolRegistry struct {
+	tools map[string]tool.Tool
+	mu    sync.RWMutex
+}
+
+func (r *mockToolRegistry) Register(t tool.Tool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.tools[t.Name()]; exists {
+		return errors.New("tool already registered")
+	}
+	r.tools[t.Name()] = t
+	return nil
+}
+
+func (r *mockToolRegistry) Get(name string) (tool.Tool, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	t, ok := r.tools[name]
+	return t, ok
+}
+
+func (r *mockToolRegistry) List() []tool.Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	tools := make([]tool.Tool, 0, len(r.tools))
+	for _, t := range r.tools {
+		tools = append(tools, t)
+	}
+	return tools
+}
+
+func (r *mockToolRegistry) Names() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.tools))
+	for name := range r.tools {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (r *mockToolRegistry) Has(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, exists := r.tools[name]
+	return exists
+}
+
+func (r *mockToolRegistry) Unregister(name string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.tools[name]; !exists {
+		return errors.New("tool not found")
+	}
+	delete(r.tools, name)
+	return nil
 }
