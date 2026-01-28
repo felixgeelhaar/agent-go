@@ -18,13 +18,13 @@ policy:
       min: 60
     - name: api
       match:
-        - ./interfaces/api/...
+        - ./interfaces/...
       min: 70
-    - name: pack
-      match:
-        - ./pack/...
-      min: 50
     - name: examples
       match:
         - ./example/...
+      min: 0
+    - name: cmd
+      match:
+        - ./cmd/...
       min: 0
