@@ -303,26 +303,25 @@ func (p *spreadsheetPack) appendCSVTool() tool.Tool {
 				return tool.Result{}, fmt.Errorf("failed to open file: %w", err)
 			}
 
-			writer := csv.NewWriter(file)
-			if params.Delimiter != "" && len(params.Delimiter) > 0 {
-				writer.Comma = rune(params.Delimiter[0])
-			}
-
-			for _, row := range rows {
-				if err := writer.Write(row); err != nil {
-					file.Close()
-					return tool.Result{}, fmt.Errorf("failed to write row: %w", err)
+			writeErr := func() error {
+				writer := csv.NewWriter(file)
+				if params.Delimiter != "" && len(params.Delimiter) > 0 {
+					writer.Comma = rune(params.Delimiter[0])
 				}
-			}
-			writer.Flush()
 
-			if err := writer.Error(); err != nil {
-				file.Close()
-				return tool.Result{}, fmt.Errorf("CSV write error: %w", err)
-			}
+				for _, row := range rows {
+					if err := writer.Write(row); err != nil {
+						return fmt.Errorf("failed to write row: %w", err)
+					}
+				}
+				writer.Flush()
+				return writer.Error()
+			}()
 
-			if err := file.Close(); err != nil {
-				return tool.Result{}, fmt.Errorf("failed to close file: %w", err)
+			if closeErr := file.Close(); writeErr != nil {
+				return tool.Result{}, writeErr
+			} else if closeErr != nil {
+				return tool.Result{}, fmt.Errorf("failed to close file: %w", closeErr)
 			}
 
 			result := map[string]interface{}{
