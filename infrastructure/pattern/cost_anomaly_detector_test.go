@@ -244,7 +244,7 @@ func TestCostAnomalyDetector_Detect_NotEnoughSamples(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if patterns != nil && len(patterns) != 0 {
+	if len(patterns) != 0 {
 		t.Errorf("expected nil or empty patterns when sample size too small, got %d", len(patterns))
 	}
 }
@@ -370,7 +370,7 @@ func TestCostAnomalyDetector_Detect_EmptyStore(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if patterns != nil && len(patterns) != 0 {
+	if len(patterns) != 0 {
 		t.Errorf("expected nil or empty patterns for empty store, got %d", len(patterns))
 	}
 }

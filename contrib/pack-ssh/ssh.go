@@ -17,6 +17,7 @@ import (
 	"github.com/felixgeelhaar/agent-go/domain/pack"
 	"github.com/felixgeelhaar/agent-go/domain/tool"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // ConnectionPool manages SSH connections.
@@ -57,15 +58,16 @@ func connectTool() tool.Tool {
 		WithDescription("Connect to an SSH server").
 		WithHandler(func(ctx context.Context, input json.RawMessage) (tool.Result, error) {
 			var params struct {
-				Host       string `json:"host"`
-				Port       int    `json:"port,omitempty"`
-				User       string `json:"user"`
-				Password   string `json:"password,omitempty"`
-				KeyFile    string `json:"key_file,omitempty"`
-				KeyData    string `json:"key_data,omitempty"`
-				Passphrase string `json:"passphrase,omitempty"`
-				ID         string `json:"id,omitempty"`
-				Timeout    int    `json:"timeout_ms,omitempty"`
+				Host           string `json:"host"`
+				Port           int    `json:"port,omitempty"`
+				User           string `json:"user"`
+				Password       string `json:"password,omitempty"`
+				KeyFile        string `json:"key_file,omitempty"`
+				KeyData        string `json:"key_data,omitempty"`
+				Passphrase     string `json:"passphrase,omitempty"`
+				ID             string `json:"id,omitempty"`
+				Timeout        int    `json:"timeout_ms,omitempty"`
+				KnownHostsFile string `json:"known_hosts_file,omitempty"`
 			}
 			if err := json.Unmarshal(input, &params); err != nil {
 				return tool.Result{}, err
@@ -124,10 +126,22 @@ func connectTool() tool.Tool {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
 			}
 
+			var hostKeyCallback ssh.HostKeyCallback
+			if params.KnownHostsFile != "" {
+				var khErr error
+				hostKeyCallback, khErr = knownhosts.New(params.KnownHostsFile)
+				if khErr != nil {
+					return tool.Result{}, fmt.Errorf("failed to load known_hosts: %w", khErr)
+				}
+			} else {
+				// #nosec G106 -- InsecureIgnoreHostKey used when no known_hosts_file is provided; callers should supply known_hosts_file in production
+				hostKeyCallback = ssh.InsecureIgnoreHostKey()
+			}
+
 			config := &ssh.ClientConfig{
 				User:            params.User,
 				Auth:            authMethods,
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- intentional for tool flexibility; users should provide known_hosts in production
+				HostKeyCallback: hostKeyCallback,
 				Timeout:         timeout,
 			}
 

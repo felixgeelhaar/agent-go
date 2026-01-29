@@ -184,7 +184,7 @@ func TestTimeoutDetector_Detect_MinTimeoutRateThreshold(t *testing.T) {
 	runStore := memory.NewRunStore()
 
 	// Create run with 3 timeouts but 50 total calls (6% timeout rate < 10% threshold)
-	runID := fmt.Sprintf("run-low-rate")
+	runID := "run-low-rate"
 	r := agent.NewRun(runID, "test goal")
 	r.Status = agent.RunStatusCompleted
 	if err := runStore.Save(ctx, r); err != nil {
