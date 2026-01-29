@@ -335,11 +335,12 @@ func TestToolPreferenceDetector_Detect_SuccessRateCalculation(t *testing.T) {
 		if err := p.GetData(&data); err != nil {
 			t.Fatalf("failed to get pattern data: %v", err)
 		}
-		if data.ToolName == "tool_a" {
+		switch data.ToolName {
+		case "tool_a":
 			if data.SuccessRate != 1.0 {
 				t.Errorf("expected tool_a success rate 1.0, got %f", data.SuccessRate)
 			}
-		} else if data.ToolName == "tool_b" {
+		case "tool_b":
 			if data.SuccessRate != 0.0 {
 				t.Errorf("expected tool_b success rate 0.0, got %f", data.SuccessRate)
 			}

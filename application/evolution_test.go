@@ -675,7 +675,7 @@ func TestEvolutionService_CreateProposal_HappyPath(t *testing.T) {
 		t.Fatalf("CreateProposal() unexpected error = %v", err)
 	}
 	if prop == nil {
-		t.Error("CreateProposal() should return non-nil proposal")
+		t.Fatal("CreateProposal() should return non-nil proposal")
 	}
 	if prop.Title != "Test Proposal" {
 		t.Errorf("Proposal.Title = %s, want Test Proposal", prop.Title)
