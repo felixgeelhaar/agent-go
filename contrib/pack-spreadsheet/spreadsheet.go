@@ -302,7 +302,6 @@ func (p *spreadsheetPack) appendCSVTool() tool.Tool {
 			if err != nil {
 				return tool.Result{}, fmt.Errorf("failed to open file: %w", err)
 			}
-			defer file.Close()
 
 			writer := csv.NewWriter(file)
 			if params.Delimiter != "" && len(params.Delimiter) > 0 {
@@ -311,13 +310,19 @@ func (p *spreadsheetPack) appendCSVTool() tool.Tool {
 
 			for _, row := range rows {
 				if err := writer.Write(row); err != nil {
+					file.Close()
 					return tool.Result{}, fmt.Errorf("failed to write row: %w", err)
 				}
 			}
 			writer.Flush()
 
 			if err := writer.Error(); err != nil {
+				file.Close()
 				return tool.Result{}, fmt.Errorf("CSV write error: %w", err)
+			}
+
+			if err := file.Close(); err != nil {
+				return tool.Result{}, fmt.Errorf("failed to close file: %w", err)
 			}
 
 			result := map[string]interface{}{
