@@ -14,7 +14,7 @@ const base = import.meta.env.BASE_URL;
                 <div class="hero-content">
                     <div class="hero-badge">
                         <span class="badge-dot"></span>
-                        <span>State-Driven Agent Runtime</span>
+                        <span>v0.5.0 — 500+ Tool Packs</span>
                     </div>
                     <h1>
                         <span class="hero-line">Build agents with</span>
@@ -81,6 +81,73 @@ const base = import.meta.env.BASE_URL;
                         <h3>Knowledge Store</h3>
                         <p>Vector embeddings with cosine similarity search. RAG-ready architecture for persistent agent memory.</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tool Packs Section -->
+        <section class="packs" id="packs">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">// TOOL PACKS</span>
+                    <h2>500+ Tools, Opt-In</h2>
+                    <p class="section-lead">
+                        Modular contrib packages. Import only what you need.
+                        Every tool has annotations, schema validation, and resilience built in.
+                    </p>
+                </div>
+                <div class="packs-grid">
+                    <div class="pack-card">
+                        <div class="pack-icon">🔐</div>
+                        <h3>Security & Crypto</h3>
+                        <p>Encryption, hashing, signing, key generation, JWT operations</p>
+                        <span class="pack-count">19 tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">📊</div>
+                        <h3>Data Processing</h3>
+                        <p>JSON, YAML, CSV, Excel, archive, template, regex</p>
+                        <span class="pack-count">80+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">🌐</div>
+                        <h3>Network & Protocol</h3>
+                        <p>HTTP, DNS, SSH, MQTT, gRPC, WebSocket, port scanning</p>
+                        <span class="pack-count">90+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">🗄️</div>
+                        <h3>Database & Storage</h3>
+                        <p>SQL, PostgreSQL, SQLite, Redis, filesystem operations</p>
+                        <span class="pack-count">30+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">🧠</div>
+                        <h3>AI/ML & Analytics</h3>
+                        <p>Embeddings, classification, NER, statistics, charting</p>
+                        <span class="pack-count">90+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">🔗</div>
+                        <h3>Integrations</h3>
+                        <p>GitHub, Slack, Jira, browser automation, Git operations</p>
+                        <span class="pack-count">50+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">📝</div>
+                        <h3>Text & Content</h3>
+                        <p>Markdown, HTML, XML, QR codes, text similarity, AST parsing</p>
+                        <span class="pack-count">80+ tools</span>
+                    </div>
+                    <div class="pack-card">
+                        <div class="pack-icon">🛠️</div>
+                        <h3>Utility</h3>
+                        <p>UUID, hash, color, random, validation, date/time, cron, semver</p>
+                        <span class="pack-count">90+ tools</span>
+                    </div>
+                </div>
+                <div class="packs-install">
+                    <code>go get github.com/felixgeelhaar/agent-go/contrib/pack-json@v0.5.0</code>
                 </div>
             </div>
         </section>
@@ -231,6 +298,18 @@ const base = import.meta.env.BASE_URL;
                         <ul class="arch-items">
                             <li><code>agent.go</code> Engine, Options, Re-exports</li>
                             <li><code>builders.go</code> Fluent constructors</li>
+                        </ul>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-header">
+                            <span class="arch-layer-tag">contrib/</span>
+                            <h4>Tool Packs <span class="arch-new-badge">new</span></h4>
+                        </div>
+                        <ul class="arch-items">
+                            <li><code>pack-*/</code> 500+ opt-in tools as Go modules</li>
+                            <li><code>storage-*/</code> Postgres, Redis, SQLite, DynamoDB</li>
+                            <li><code>planner-llm/</code> Claude, OpenAI, Gemini, Ollama</li>
+                            <li><code>dashboard/</code> Observability UI</li>
                         </ul>
                     </div>
                 </div>
@@ -395,6 +474,75 @@ const base = import.meta.env.BASE_URL;
     font-size: 0.85rem;
     line-height: 1.7;
     color: var(--text-secondary);
+}
+
+/* Tool Packs Section */
+.packs {
+    padding: var(--space-4xl) 0;
+}
+
+.packs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.pack-card {
+    padding: var(--space-xl);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    transition: all var(--transition-base);
+}
+
+.pack-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-4px);
+}
+
+.pack-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-md);
+}
+
+.pack-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: var(--space-sm);
+    color: var(--text-primary);
+}
+
+.pack-card p {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+}
+
+.pack-count {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    padding: 2px 8px;
+    background: rgba(0, 200, 200, 0.1);
+    border-radius: 4px;
+}
+
+.packs-install {
+    display: inline-block;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.packs-install code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent-cyan);
 }
 
 /* States Section */
@@ -564,6 +712,20 @@ const base = import.meta.env.BASE_URL;
     margin-right: var(--space-sm);
 }
 
+.arch-new-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-cyan);
+    background: rgba(0, 200, 200, 0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: var(--space-sm);
+    vertical-align: middle;
+}
+
 /* Agent Showcase Section */
 .agent-showcase {
     padding: var(--space-4xl) 0;
@@ -623,6 +785,10 @@ const base = import.meta.env.BASE_URL;
         grid-template-columns: repeat(2, 1fr);
     }
 
+    .packs-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
     .arch-grid {
         grid-template-columns: 1fr;
     }
@@ -630,6 +796,10 @@ const base = import.meta.env.BASE_URL;
 
 @media (max-width: 768px) {
     .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .packs-grid {
         grid-template-columns: 1fr;
     }
 
