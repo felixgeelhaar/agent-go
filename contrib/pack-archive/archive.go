@@ -76,15 +76,18 @@ func Pack(cfg Config) *pack.Pack {
 // isPathSafe validates that the target path does not escape the base directory.
 // This prevents zip slip and path traversal attacks.
 func isPathSafe(basePath, targetPath string) bool {
-	// Clean both paths to resolve any .. or . components
 	cleanBase := filepath.Clean(basePath)
 	cleanTarget := filepath.Clean(targetPath)
 
-	// Check if the target path starts with the base path
-	if !strings.HasPrefix(cleanTarget, cleanBase+string(os.PathSeparator)) && cleanTarget != cleanBase {
+	// Use filepath.Rel to determine if target is within base
+	rel, err := filepath.Rel(cleanBase, cleanTarget)
+	if err != nil {
 		return false
 	}
-
+	// Reject if the relative path escapes the base directory
+	if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
+		return false
+	}
 	return true
 }
 
@@ -222,7 +225,7 @@ func (p *archivePack) extractZipTool() tool.Tool {
 				}
 
 				// Validate path to prevent zip slip attacks
-				destPath := filepath.Join(params.Output, file.Name) // #nosec G305 -- Path is validated by isPathSafe below
+				destPath := filepath.Join(params.Output, filepath.Clean(file.Name)) // #nosec G305 -- Path validated by isPathSafe using filepath.Rel
 				if !isPathSafe(params.Output, destPath) {
 					continue // Skip files that would escape the output directory
 				}
@@ -493,6 +496,12 @@ func (p *archivePack) extractZipFileTool() tool.Tool {
 
 			for _, file := range reader.File {
 				if file.Name == params.FileName {
+					// Validate output path to prevent zip slip attacks
+					outputDir := filepath.Dir(filepath.Clean(params.Output))
+					if !isPathSafe(outputDir, filepath.Clean(params.Output)) {
+						return tool.Result{}, fmt.Errorf("unsafe output path: %s", params.Output)
+					}
+
 					// #nosec G301 -- Directory permissions 0755 are intentional for user-accessible directories
 					if err := os.MkdirAll(filepath.Dir(params.Output), 0755); err != nil {
 						return tool.Result{}, fmt.Errorf("failed to create dir: %w", err)
@@ -673,7 +682,7 @@ func (p *archivePack) extractTarTool() tool.Tool {
 				}
 
 				// Validate path to prevent path traversal attacks
-				destPath := filepath.Join(params.Output, header.Name) // #nosec G305 -- Path is validated by isPathSafe below
+				destPath := filepath.Join(params.Output, filepath.Clean(header.Name)) // #nosec G305 -- Path validated by isPathSafe using filepath.Rel
 				if !isPathSafe(params.Output, destPath) {
 					continue
 				}
@@ -1091,7 +1100,7 @@ func (p *archivePack) extractTarGzTool() tool.Tool {
 				}
 
 				// Validate path to prevent path traversal attacks
-				destPath := filepath.Join(params.Output, header.Name) // #nosec G305 -- Path is validated by isPathSafe below
+				destPath := filepath.Join(params.Output, filepath.Clean(header.Name)) // #nosec G305 -- Path validated by isPathSafe using filepath.Rel
 				if !isPathSafe(params.Output, destPath) {
 					continue
 				}
