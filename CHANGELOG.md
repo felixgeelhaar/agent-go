@@ -5,9 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Release 0.5.0
-
 ## [Unreleased]
+
+## [0.5.0] - 2026-01-29
+
+### Added
+
+#### New Tool Packs (500+ tools)
+- **Data Processing**: JSON, YAML, CSV/Excel spreadsheet, archive (zip/tar/gzip), template rendering, regex
+- **Cryptographic**: Encryption, hashing, signing, key generation (19 tools)
+- **Text Processing**: Markdown, HTML, XML, QR code, text similarity (42 tools)
+- **Code & Development**: AST parsing, diff, semver, changelog, license detection
+- **Data & Analytics**: Dataframe operations, statistics, charting
+- **Network & Observability**: HTTP, DNS, ping, port scanning, monitoring (46 tools)
+- **Infrastructure & Protocol**: SSH, MQTT, gRPC, WebSocket (46 tools)
+- **AI/ML**: Embeddings, classification, NER (46 tools)
+- **Utility**: UUID, hash, color, random, validation, date/time, cron (48+ tools)
+- **Collections**: Finance, phone, password, emoji, country, credit card, user agent
+- **Browser Automation**: 24 browser tools for web interaction
+- **SQL Database**: 13 SQL operation tools
+- **Integrations**: Jira, GitHub, Slack tool packs
+
+#### Architecture
+- Multi-module workspace with opt-in contrib packages
+- 35 plugins across infrastructure and packs
+
+### Fixed
+
+#### Security
+- Resolve all 140 gosec security warnings
+- Fix SQL injection vulnerabilities in pack-sql
+- Fix zip slip path traversal in pack-archive (filepath.Rel validation)
+- Add known_hosts_file support to SSH connect tool
+- Handle file.Close() return values in spreadsheet CSV export
+- Update golang-jwt to patch CVE vulnerabilities
+
+#### Other
+- Remove non-existent pack domain from coverctl config
+- Remove unused variable in pack-jwt
+
+### Changed
+- Upgrade codeql-action/upload-sarif from v3 to v4
+- Bump golang-jwt/jwt v4.4.2 → v4.5.2
+- Migrate pack-jira from go-jira to jirasdk
+- Raise test coverage from 67% to 88%
 
 ## [0.1.0] - 2026-01-15
 
@@ -70,5 +111,6 @@ Release 0.5.0
 - go.opentelemetry.io/otel v1.39.0
 - And various cloud SDKs (AWS, GCP, Azure)
 
-[unreleased]: https://github.com/felixgeelhaar/agent-go/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/felixgeelhaar/agent-go/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/felixgeelhaar/agent-go/compare/v0.1.0...v0.5.0
 [0.1.0]: https://github.com/felixgeelhaar/agent-go/releases/tag/v0.1.0
