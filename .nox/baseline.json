@@ -1,0 +1,320 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "fingerprint": "a6c45eb73ea37ef9c110514f1a68718953da43f3f686cb08ee23f3624164fd28",
+      "rule_id": "AI-006",
+      "file_path": "contrib/pack-prompt/prompt.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "85287ea5cf6cce22576abe7e36a5fdeaf9aba2e74eecd370a3f30c323f612213",
+      "rule_id": "AI-036",
+      "file_path": "contrib/pack-prompt/prompt.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "c0fef4bb0097e9d1324d7e0523bf3a3abba6631afc49a31aa296ca33630483af",
+      "rule_id": "AI-047",
+      "file_path": "infrastructure/notification/webhook_notifier_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "2fd996f3fe30fbc8e90f8dfc8ac848635ff0a29ccdecb6b7d3f151cded859330",
+      "rule_id": "AI-047",
+      "file_path": "infrastructure/notification/webhook_notifier_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "575ca42139fc441f52e75598bddbeb159b19bdd474eea9ed23ff84830a22132c",
+      "rule_id": "CRYPTO-001",
+      "file_path": "contrib/pack-crypto/crypto.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "8752584b29f49cee5eddfc38b69a6fb61901caffe6bcae8b4838da6e953cdc00",
+      "rule_id": "CRYPTO-001",
+      "file_path": "contrib/pack-crypto/crypto.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "6eb7f81eab49d9c5c24ddd0faa033c237fd59c1d33eaf45a45ca78bc6720dc7f",
+      "rule_id": "CRYPTO-001",
+      "file_path": "contrib/pack-fileops/fileops.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "da07b6346a0f6013f5b3bdcfd482f22bd484cf157b524a3afa1063d12cba7993",
+      "rule_id": "CRYPTO-001",
+      "file_path": "contrib/storage-gcs/gcs.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "4ba522d827965279b97e15cb215f5f024176290f4700c113b24cd4039644b639",
+      "rule_id": "DATA-001",
+      "file_path": "contrib/ai/ai_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "ac02f78e1fe66115ce2cde7f53e9f10f869ecef37d697d7a2c63518aec59ae5e",
+      "rule_id": "DATA-001",
+      "file_path": "contrib/pack-git/pack_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "9bc36fa9c9282df6fa77619cca9f30a886cbe780f0d706c42fe727202b4815f4",
+      "rule_id": "DATA-001",
+      "file_path": "contrib/pack-openapi/openapi.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "18bb74252f6e57f7e4e0bd9bce8e879f011d03bdd235706880f9283b512be3e9",
+      "rule_id": "DATA-001",
+      "file_path": "contrib/pack-validate/pack_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "a07397e3e514a518d1c61ccf735c4b90ab46565d4197532a3719b277a79fa4e6",
+      "rule_id": "DATA-001",
+      "file_path": "domain/event/event_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "fe122e6e16d7bbfee3b5a66a8b886bf18ef25fe641d17aeac7b5e1bbba4d25c4",
+      "rule_id": "DATA-001",
+      "file_path": "example/customer-support/main.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "2a067303ce455559970a3bde015cac1104b255b3326e65be68e2b233c63879b9",
+      "rule_id": "DATA-001",
+      "file_path": "example/customer-support/tools.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "d6c76820ceeee2aa95bcf0bd1a262bb0ff1a65cc7900a9694aad4b87c2eb0cd3",
+      "rule_id": "DATA-001",
+      "file_path": "example/customer-support/tools.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "b5f861329c76888a5d8f18009eb6381067b9c7b4eaa3902ead22f6bd12937b19",
+      "rule_id": "DATA-001",
+      "file_path": "example/governed_adaptivity/main.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "6c5101e6b752953bb674c659e339dd2b956f2da86aceb33266461187d63fbcbb",
+      "rule_id": "DATA-001",
+      "file_path": "example/governed_adaptivity/main.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "5e7f43407f79888cae5d8dc96049d92a9c7ca546e66f12c831c86804edaca887",
+      "rule_id": "DATA-001",
+      "file_path": "infrastructure/security/validation/validator_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "5a94af45402f6545f820ea867f64ee707aa46014bfde474b665e1b57602f5653",
+      "rule_id": "DATA-001",
+      "file_path": "infrastructure/security/validation/validator_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "04e554a786e3ba0cbaa199c28e8c99cec6dcc5f80278ad163abe090954ebdf31",
+      "rule_id": "DATA-001",
+      "file_path": "infrastructure/security/validation/validator_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "61e5f80d1c13fa6188c3f4c8bc947c12e2bd147c178197cf32ca17dd64bdd9fd",
+      "rule_id": "DATA-001",
+      "file_path": "infrastructure/security/validation/validator_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "82d80a64e9c47df5b818402004c13cee96d1655765a51ba43d768e1dc9bf00dd",
+      "rule_id": "DATA-001",
+      "file_path": "website-astro/src/components/AgentShowcase.vue",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "70ee8052aa5a37e68bc28a783c7afdbc65144e67c77e5c4b91acee73c6fd2904",
+      "rule_id": "DATA-003",
+      "file_path": "contrib/pack-creditcard/creditcard.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "b586f73ce209e71d752886fdf87e18ac05729a3f415a2df1e68ce90e11a9f39d",
+      "rule_id": "DATA-003",
+      "file_path": "contrib/pack-creditcard/creditcard.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "db18f23d589ea536026d96602c31e07f4c0f787d76171ca8d1e0a2a76c99220e",
+      "rule_id": "DATA-003",
+      "file_path": "contrib/pack-creditcard/creditcard.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "d029dde8cbe2d4251a22380d501d5c48e1b7d1e13eed3de8f41b20ab9abc2555",
+      "rule_id": "DATA-003",
+      "file_path": "contrib/pack-creditcard/creditcard.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "7ae049883b5924c12941758f3b5be63952066549616d7e131790d35fd89fff90",
+      "rule_id": "SEC-161",
+      "file_path": "infrastructure/storage/filesystem/artifact_store.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "9f6e1b65b00ff77cd4d9990b365fb3520edf7f4743271e8674771efc248186d0",
+      "rule_id": "SEC-161",
+      "file_path": "infrastructure/storage/filesystem/artifact_store_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "9b420bc2bd29008afa82f5426e9bf01dd77bd701be4a9c1e894c55aec56adb10",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/pack-crypto/pack_test.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "7b0e3a93f19ce02f2b7b8bf7b6be88edfd486392d2d8e08c6622194c3ea85235",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/pack-random/random.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "dac542cf31cc34402860bbbe5b0e26b9d3330bd5b08db17aa0f060e5ba6c693a",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/pack-random/random.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "fcde4371096eaab6b53017eb8349aaad4a3f079afbba83e3f7adcd0fd57f6727",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/pack-ssh/ssh.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "29b97614e2ecd1c665f9262c94435b2b09009bc2214972dbe1d9e09c7265a81d",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/planner-llm/providers/bedrock.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "8d4335bdbe4d00006cae03134dd4dd1cb249553fcd48db7d3b1844f8a4f31378",
+      "rule_id": "SEC-163",
+      "file_path": "contrib/planner-llm/providers/gemini.go",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "5d32c570827df884e4e65fefe7638bdc45311f1c795ec0a1ffd23b5af1e865ed",
+      "rule_id": "SEC-461",
+      "file_path": "contrib/queue-rabbitmq/rabbitmq.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "4e6f2430870f72f7ae57a7c843b5a3d68e0c9435a6c08debc656f4a8f4b14d07",
+      "rule_id": "SEC-461",
+      "file_path": "contrib/queue-rabbitmq/rabbitmq_test.go",
+      "severity": "high",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "b70bfbd98df51f05859f391e0c53b8a1b8263afb9db61464a9b68f995ba24bb5",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/pack-crypto/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "697528e19aacee271f4d87be2c75c6fc00611db3c15814fd9619dc71a5389041",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/pack-spreadsheet/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "67911b4a2080aad669760d65badf7b8ca29effa559aedbc7ecd1d79d131d4c90",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/pack-sql/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "c161bbdb146c89574b9031d68e9772a1fabee3bcadd86ca7c6d853799b7aaca0",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/pack-ssh/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "80a1c8065cd8bc56ff914cfcd83e679632115da5f70fd644f75280b39f52e3ab",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/storage-gcs/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "8101fde1e35460957d5cfed8d7ab80cde2ba0a525f912811f1ae40ce0a506881",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/storage-mongodb/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "8b26f0d3b15a32c3d6bc772fcdf60cdc7ed89368aa07e171a5bcce8e82da7d10",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/storage-nats/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    },
+    {
+      "fingerprint": "b2f85da6288b661aba5e9a0c68b45d14ffa6d34262db2b253be41de369319b86",
+      "rule_id": "VULN-001",
+      "file_path": "contrib/storage-postgres/go.mod",
+      "severity": "info",
+      "created_at": "2026-07-25T19:23:53.697555Z"
+    }
+  ]
+}
