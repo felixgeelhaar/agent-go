@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	plannerllm "go.klarlabs.de/agent/contrib/planner-llm"
@@ -45,7 +46,7 @@ func doRequest(ctx context.Context, method, url string, headers map[string]strin
 
 	httpReq, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(payload))
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return nil, fmt.Errorf("create request: %w", redactURLError(err))
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -59,7 +60,7 @@ func doRequest(ctx context.Context, method, url string, headers map[string]strin
 		if ctx.Err() != nil {
 			return nil, ErrContextCanceled
 		}
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, redactURLError(err))
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
@@ -76,6 +77,45 @@ func doRequest(ctx context.Context, method, url string, headers map[string]strin
 	}
 
 	return respBody, nil
+}
+
+// redactURLError strips credential-bearing parts of the URL from a *url.Error
+// before it is formatted into a message a caller is likely to log.
+//
+// net/url's own redaction covers userinfo only: a *url.Error returned by
+// http.Client.Do renders the full request URL, query string included. Providers
+// should not put secrets in query strings at all (see gemini.go), but transport
+// errors are the one place where a URL escapes into an error string verbatim, so
+// the query is dropped here as well — belt and braces for any future endpoint
+// that carries a token, signature or session ID as a parameter.
+//
+// Errors that are not *url.Error are returned unchanged.
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+
+	redacted := *urlErr
+	redacted.URL = redactURL(urlErr.URL)
+	return &redacted
+}
+
+// redactURL returns raw with any userinfo and query string removed.
+func redactURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		// Unparseable URLs may still contain a secret; reveal nothing.
+		return "[redacted]"
+	}
+
+	parsed.User = nil
+	if parsed.RawQuery != "" {
+		parsed.RawQuery = "[redacted]"
+	}
+	parsed.Fragment = ""
+
+	return parsed.String()
 }
 
 // resolveModel returns the first non-empty model string.

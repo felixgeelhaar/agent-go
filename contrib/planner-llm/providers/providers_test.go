@@ -3,9 +3,12 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	plannerllm "go.klarlabs.de/agent/contrib/planner-llm"
@@ -735,5 +738,108 @@ func TestResolveModel(t *testing.T) {
 	}
 	if m := resolveModel("", "", "default"); m != "default" {
 		t.Errorf("expected default, got %q", m)
+	}
+}
+
+// --- API key leakage regression tests ---
+
+const testGeminiKey = "AIzaSy-super-secret-gemini-key"
+
+// TestGemini_SendsAPIKeyAsHeader pins the transport of the credential: the key
+// belongs in a header, not in "?key=", where it is captured by proxy and server
+// access logs and rendered verbatim inside *url.Error on any transport failure.
+func TestGemini_SendsAPIKeyAsHeader(t *testing.T) {
+	t.Parallel()
+
+	var gotHeader, gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("x-goog-api-key")
+		gotQuery = r.URL.RawQuery
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	p := NewGeminiProvider(GeminiConfig{APIKey: testGeminiKey, BaseURL: srv.URL})
+	if _, err := p.Complete(context.Background(), plannerllm.CompletionRequest{
+		Messages: testMessages(),
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotHeader != testGeminiKey {
+		t.Errorf("x-goog-api-key header = %q, want the configured API key", gotHeader)
+	}
+	if gotQuery != "" {
+		t.Errorf("request query string = %q, want empty: credentials must not travel in the URL", gotQuery)
+	}
+	if strings.Contains(gotQuery, testGeminiKey) {
+		t.Error("API key found in request query string")
+	}
+}
+
+// TestGemini_APIKeyNotInTransportError is the regression test for the leak
+// itself. http.Client.Do returns a *url.Error whose Error() prints the whole
+// request URL — net/url redacts userinfo, never the query — and doRequest
+// formatted that verbatim into the returned error, so a single connection
+// failure put a live API key wherever the caller logged it.
+func TestGemini_APIKeyNotInTransportError(t *testing.T) {
+	t.Parallel()
+
+	// Start and immediately stop a server so the address is closed: Complete
+	// then fails inside the transport, the one path that embeds the URL.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	baseURL := srv.URL
+	srv.Close()
+
+	p := NewGeminiProvider(GeminiConfig{APIKey: testGeminiKey, BaseURL: baseURL, Timeout: 5})
+	_, err := p.Complete(context.Background(), plannerllm.CompletionRequest{
+		Messages: testMessages(),
+	})
+	if err == nil {
+		t.Fatal("expected a transport error against a closed port")
+	}
+	if !errors.Is(err, ErrConnectionFailed) {
+		t.Fatalf("error = %v, want it to wrap ErrConnectionFailed", err)
+	}
+	if strings.Contains(err.Error(), testGeminiKey) {
+		t.Errorf("API key leaked into error string: %v", err)
+	}
+}
+
+// TestRedactURLError covers the second layer: even if some endpoint puts a
+// secret in a query string again, transport errors must not carry it.
+func TestRedactURLError(t *testing.T) {
+	t.Parallel()
+
+	inner := errors.New("connection refused")
+	err := redactURLError(&url.Error{
+		Op:  "Post",
+		URL: "https://user:hunter2@example.com/v1/models/x:generateContent?key=" + testGeminiKey + "&alt=sse#frag",
+		Err: inner,
+	})
+
+	msg := err.Error()
+	for _, secret := range []string{testGeminiKey, "hunter2", "alt=sse", "frag"} {
+		if strings.Contains(msg, secret) {
+			t.Errorf("redactURLError() left %q in %q", secret, msg)
+		}
+	}
+	if !strings.Contains(msg, "example.com/v1/models/x:generateContent") {
+		t.Errorf("redactURLError() should keep the non-secret part of the URL, got %q", msg)
+	}
+	if !errors.Is(err, inner) {
+		t.Error("redactURLError() must preserve the wrapped cause")
+	}
+
+	// Non-URL errors pass through untouched.
+	plain := errors.New("boom")
+	if got := redactURLError(plain); got != plain {
+		t.Errorf("redactURLError(plain) = %v, want the original error", got)
+	}
+
+	// An unparseable URL reveals nothing at all.
+	bad := redactURLError(&url.Error{Op: "Post", URL: "://%%zz?key=" + testGeminiKey, Err: inner})
+	if strings.Contains(bad.Error(), testGeminiKey) {
+		t.Errorf("redactURLError() leaked the key from an unparseable URL: %v", bad)
 	}
 }

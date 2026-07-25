@@ -169,8 +169,13 @@ func (p *GeminiProvider) Complete(ctx context.Context, req plannerllm.Completion
 		body.Tools = []geminiToolDef{{FunctionDeclarations: decls}}
 	}
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", p.config.BaseURL, model, p.config.APIKey)
-	respBody, err := doRequest(ctx, "POST", url, nil, body, p.config.Timeout)
+	// The API key travels in a header, never in the query string: a URL carrying
+	// "?key=<secret>" ends up verbatim inside *url.Error on any transport failure
+	// (Go redacts userinfo, never the query) and from there into logs, and it is
+	// also recorded by proxies and server access logs.
+	url := fmt.Sprintf("%s/models/%s:generateContent", p.config.BaseURL, model)
+	headers := map[string]string{"x-goog-api-key": p.config.APIKey}
+	respBody, err := doRequest(ctx, "POST", url, headers, body, p.config.Timeout)
 	if err != nil {
 		return plannerllm.CompletionResponse{}, err
 	}
