@@ -7,6 +7,6 @@ require (
 	go.klarlabs.de/agent v0.0.0
 )
 
-require golang.org/x/net v0.54.0 // indirect
+require golang.org/x/net v0.57.0 // indirect
 
 replace go.klarlabs.de/agent => ../..

@@ -9,7 +9,7 @@ require (
 
 require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
-	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 )
 
 replace go.klarlabs.de/agent => ../..

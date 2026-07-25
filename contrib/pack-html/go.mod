@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	go.klarlabs.de/agent v0.0.0
-	golang.org/x/net v0.55.0
+	golang.org/x/net v0.57.0
 )
 
 replace go.klarlabs.de/agent => ../..
