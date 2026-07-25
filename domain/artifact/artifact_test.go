@@ -1,6 +1,7 @@
 package artifact_test
 
 import (
+	"strings"
 	"testing"
 
 	"go.klarlabs.de/agent/domain/artifact"
@@ -336,6 +337,52 @@ func TestDomainErrors(t *testing.T) {
 
 			if tt.err.Error() != tt.msg {
 				t.Errorf("%s.Error() = %s, want %s", tt.name, tt.err.Error(), tt.msg)
+			}
+		})
+	}
+}
+
+// TestIsValidID is a regression test for a Ref.IsValid that only checked for a
+// non-empty ID. Stores use the ID as a path component or object key, so a ref
+// carrying "../../etc" passed validation and escaped the store's base directory.
+func TestIsValidID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		id    string
+		valid bool
+	}{
+		{"generated filesystem ID", "1700000000000000000-a1b2c3d4e5f6g7h8", true},
+		{"uuid as used by the GCS store", "3f2504e0-4f89-11d3-9a0c-0305e82c3301", true},
+		{"simple identifier", "art-123", true},
+		{"underscores and dots", "art_123.v2", true},
+		{"maximum length", strings.Repeat("a", artifact.MaxIDLength), true},
+
+		{"empty", "", false},
+		{"parent directory", "..", false},
+		{"current directory", ".", false},
+		{"relative traversal", "../../etc", false},
+		{"traversal with prefix", "artifacts/../../etc", false},
+		{"absolute path", "/etc/passwd", false},
+		{"nested path", "sub/dir", false},
+		{"windows separator", `sub\dir`, false},
+		{"null byte", "a\x00b", false},
+		{"newline", "a\nb", false},
+		{"space", "a b", false},
+		{"over maximum length", strings.Repeat("a", artifact.MaxIDLength+1), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := artifact.IsValidID(tt.id); got != tt.valid {
+				t.Errorf("artifact.IsValidID(%q) = %v, want %v", tt.id, got, tt.valid)
+			}
+			// Ref.IsValid must delegate to the same rule.
+			if got := (artifact.Ref{ID: tt.id}).IsValid(); got != tt.valid {
+				t.Errorf("Ref{ID: %q}.IsValid() = %v, want %v", tt.id, got, tt.valid)
 			}
 		})
 	}
