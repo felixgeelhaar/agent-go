@@ -658,3 +658,181 @@ func TestRandomString(t *testing.T) {
 		}
 	}
 }
+
+// TestArtifactStore_RejectsPathTraversal is a regression test for a path
+// traversal in the four methods that take a caller-supplied ref. They gated on
+// Ref.IsValid(), which only checked for a non-empty ID, and then handed the ID
+// to filepath.Join — which cleans "../" but does not confine. Before the fix,
+// Retrieve/Exists/Metadata read files outside basePath and Delete handed the
+// escaped path to os.RemoveAll.
+func TestArtifactStore_RejectsPathTraversal(t *testing.T) {
+	t.Parallel()
+
+	// root/
+	//   base/     <- the artifact store
+	//   outside/  <- must never be read or removed
+	root := t.TempDir()
+	base := filepath.Join(root, "base")
+	outside := filepath.Join(root, "outside")
+	if err := os.MkdirAll(outside, 0750); err != nil {
+		t.Fatal(err)
+	}
+	// Shaped like a real artifact directory so that, without the fix, every one
+	// of the four methods succeeds rather than merely erroring differently.
+	victims := map[string]string{
+		"secret.txt":    "top secret",
+		"content":       "top secret",
+		"metadata.json": `{"id":"escaped"}`,
+	}
+	for name, data := range victims {
+		if err := os.WriteFile(filepath.Join(outside, name), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	store, err := NewArtifactStore(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	hostileIDs := []string{
+		"../outside",
+		"../../base/../outside",
+		"..",
+		"../",
+		"./../outside",
+		outside, // absolute path
+		"sub/dir",
+		"nul\x00byte",
+		strings.Repeat("a", 4096),
+	}
+
+	for _, id := range hostileIDs {
+		ref := artifact.NewRef(id)
+
+		if _, err := store.Retrieve(ctx, ref); err != artifact.ErrInvalidRef {
+			t.Errorf("Retrieve(%q) error = %v, want ErrInvalidRef", id, err)
+		}
+		if _, err := store.Exists(ctx, ref); err != artifact.ErrInvalidRef {
+			t.Errorf("Exists(%q) error = %v, want ErrInvalidRef", id, err)
+		}
+		if _, err := store.Metadata(ctx, ref); err != artifact.ErrInvalidRef {
+			t.Errorf("Metadata(%q) error = %v, want ErrInvalidRef", id, err)
+		}
+		if err := store.Delete(ctx, ref); err != artifact.ErrInvalidRef {
+			t.Errorf("Delete(%q) error = %v, want ErrInvalidRef", id, err)
+		}
+	}
+
+	// Nothing outside the store may have been touched.
+	for name := range victims {
+		if _, err := os.Stat(filepath.Join(outside, name)); err != nil {
+			t.Errorf("file outside basePath was affected: %v", err)
+		}
+	}
+}
+
+// TestConfineToBase exercises the confinement layer on its own, with IDs that
+// artifact.IsValidID already rejects. The two checks are deliberately redundant;
+// this test fails if the confinement is dropped in favour of validation alone.
+func TestConfineToBase(t *testing.T) {
+	t.Parallel()
+
+	base := "/srv/artifacts"
+
+	escapes := []string{"..", "../outside", "sub/../../outside", "../artifacts-evil", "."}
+	for _, id := range escapes {
+		if got, err := confineToBase(base, id); err != artifact.ErrInvalidRef {
+			t.Errorf("confineToBase(%q, %q) = %q, %v; want ErrInvalidRef", base, id, got, err)
+		}
+	}
+
+	id := "1700000000000000000-abcdefgh"
+	got, err := confineToBase(base, id)
+	if err != nil {
+		t.Fatalf("confineToBase(%q) error = %v", id, err)
+	}
+	if want := filepath.Join(base, id); got != want {
+		t.Errorf("confineToBase(%q) = %q, want %q", id, got, want)
+	}
+}
+
+// TestRandomString_NotDerivableFromClock is a regression test for an ID
+// generator that filled every character from time.Now().UnixNano()%36 with a
+// 1ns sleep between characters. Because the clock advances by a near-constant
+// amount per iteration, the output collapsed onto a handful of symbols: a
+// measured 2000 samples yielded only 649 distinct strings drawn from 9 of the
+// 36 alphabet characters. With a CSPRNG both counts are pinned by probability,
+// not by scheduling.
+func TestRandomString_NotDerivableFromClock(t *testing.T) {
+	t.Parallel()
+
+	const (
+		samples = 2000
+		length  = 8
+		charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	)
+
+	seen := make(map[string]struct{}, samples)
+	chars := make(map[byte]struct{}, len(charset))
+	for i := 0; i < samples; i++ {
+		s := randomString(length)
+		if len(s) != length {
+			t.Fatalf("randomString(%d) length = %d", length, len(s))
+		}
+		seen[s] = struct{}{}
+		for j := 0; j < len(s); j++ {
+			if !strings.ContainsRune(charset, rune(s[j])) {
+				t.Fatalf("randomString() produced invalid character %q", s[j])
+			}
+			chars[s[j]] = struct{}{}
+		}
+	}
+
+	// 2000 draws from 36^8 (~2.8e12) values: the chance of even one collision is
+	// under one in a million, so any repeat means the source is not random.
+	if len(seen) != samples {
+		t.Errorf("randomString() produced %d distinct values out of %d samples; "+
+			"output is not cryptographically random", len(seen), samples)
+	}
+
+	// 16000 characters over a 36-symbol alphabet: the chance of missing any one
+	// symbol is ~36*(35/36)^16000, i.e. astronomically small.
+	if len(chars) != len(charset) {
+		t.Errorf("randomString() only ever emitted %d of %d alphabet characters; "+
+			"output is clock-derived, not random", len(chars), len(charset))
+	}
+}
+
+// TestGenerateArtifactID_UnpredictableSuffix asserts the property that matters
+// for path safety: knowing when an artifact was written must not be enough to
+// reconstruct its ID. The timestamp prefix is guessable by design, so the check
+// is on the random suffix alone.
+func TestGenerateArtifactID_UnpredictableSuffix(t *testing.T) {
+	t.Parallel()
+
+	const samples = 1000
+
+	suffixes := make(map[string]struct{}, samples)
+	for i := 0; i < samples; i++ {
+		id := generateArtifactID()
+		if !artifact.IsValidID(id) {
+			t.Fatalf("generateArtifactID() = %q, which artifact.IsValidID rejects", id)
+		}
+		idx := strings.LastIndex(id, "-")
+		if idx < 0 {
+			t.Fatalf("generateArtifactID() = %q, want a <nanos>-<random> shape", id)
+		}
+		suffix := id[idx+1:]
+		if len(suffix) != idRandomLength {
+			t.Fatalf("suffix %q length = %d, want %d", suffix, len(suffix), idRandomLength)
+		}
+		suffixes[suffix] = struct{}{}
+	}
+
+	if len(suffixes) != samples {
+		t.Errorf("generateArtifactID() produced %d distinct suffixes out of %d; "+
+			"IDs are predictable from the clock", len(suffixes), samples)
+	}
+}
