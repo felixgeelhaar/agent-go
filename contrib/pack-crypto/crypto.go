@@ -98,9 +98,9 @@ func (p *cryptoPack) hashTool() tool.Tool {
 			var h hash.Hash
 			switch algorithm {
 			case "md5":
-				h = md5.New() // #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
+				h = md5.New() // nox:ignore CRYPTO-001 -- MD5 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
 			case "sha1":
-				h = sha1.New() // #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
+				h = sha1.New() // nox:ignore CRYPTO-001 -- SHA1 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
 			case "sha256":
 				h = sha256.New()
 			case "sha512":
@@ -165,9 +165,9 @@ func (p *cryptoPack) hashFileTool() tool.Tool {
 			var h hash.Hash
 			switch algorithm {
 			case "md5":
-				h = md5.New() // #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
+				h = md5.New() // nox:ignore CRYPTO-001 -- MD5 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
 			case "sha1":
-				h = sha1.New() // #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
+				h = sha1.New() // nox:ignore CRYPTO-001 -- SHA1 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
 			case "sha256":
 				h = sha256.New()
 			case "sha512":
@@ -859,9 +859,9 @@ func (p *cryptoPack) checksumTool() tool.Tool {
 				var h hash.Hash
 				switch algorithm {
 				case "md5":
-					h = md5.New() // #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
+					h = md5.New() // nox:ignore CRYPTO-001 -- MD5 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
 				case "sha1":
-					h = sha1.New() // #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
+					h = sha1.New() // nox:ignore CRYPTO-001 -- SHA1 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
 				case "sha256":
 					h = sha256.New()
 				case "sha512":
@@ -924,9 +924,9 @@ func (p *cryptoPack) verifyChecksumTool() tool.Tool {
 			var h hash.Hash
 			switch algorithm {
 			case "md5":
-				h = md5.New() // #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
+				h = md5.New() // nox:ignore CRYPTO-001 -- MD5 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- MD5 is used for checksum/fingerprinting purposes, not for security
 			case "sha1":
-				h = sha1.New() // #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
+				h = sha1.New() // nox:ignore CRYPTO-001 -- SHA1 is used for checksum/fingerprinting purposes, not for security; #nosec G401 -- SHA1 is used for checksum/fingerprinting purposes, not for security
 			case "sha256":
 				h = sha256.New()
 			case "sha512":

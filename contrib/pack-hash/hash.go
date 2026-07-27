@@ -62,7 +62,7 @@ func md5Tool() tool.Tool {
 				data = params.Bytes
 			}
 
-			h := md5.Sum(data) // #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
+			h := md5.Sum(data) // nox:ignore CRYPTO-001 -- MD5 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
 			hashHex := hex.EncodeToString(h[:])
 			hashB64 := base64.StdEncoding.EncodeToString(h[:])
 
@@ -96,7 +96,7 @@ func sha1Tool() tool.Tool {
 				data = params.Bytes
 			}
 
-			h := sha1.Sum(data) // #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
+			h := sha1.Sum(data) // nox:ignore CRYPTO-001 -- SHA1 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
 			hashHex := hex.EncodeToString(h[:])
 			hashB64 := base64.StdEncoding.EncodeToString(h[:])
 
@@ -275,8 +275,8 @@ func multiTool() tool.Tool {
 
 			data := []byte(params.Text)
 
-			md5Sum := md5.Sum(data)   // #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
-			sha1Sum := sha1.Sum(data) // #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
+			md5Sum := md5.Sum(data)   // nox:ignore CRYPTO-001 -- MD5 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
+			sha1Sum := sha1.Sum(data) // nox:ignore CRYPTO-001 -- SHA1 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
 			sha256Sum := sha256.Sum256(data)
 			sha512Sum := sha512.Sum512(data)
 			crc32Sum := crc32.ChecksumIEEE(data)
@@ -315,10 +315,10 @@ func verifyTool() tool.Tool {
 
 			switch strings.ToLower(params.Algorithm) {
 			case "md5":
-				h := md5.Sum(data) // #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
+				h := md5.Sum(data) // nox:ignore CRYPTO-001 -- MD5 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- MD5 provided for checksum/fingerprinting, not cryptographic security
 				computed = hex.EncodeToString(h[:])
 			case "sha1":
-				h := sha1.Sum(data) // #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
+				h := sha1.Sum(data) // nox:ignore CRYPTO-001 -- SHA1 provided for checksum/fingerprinting, not cryptographic security; #nosec G401 -- SHA1 provided for checksum/fingerprinting, not cryptographic security
 				computed = hex.EncodeToString(h[:])
 			case "sha256":
 				h := sha256.Sum256(data)
