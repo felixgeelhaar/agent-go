@@ -1076,7 +1076,7 @@ func fileopsChecksum(baseDir string) tool.Tool {
 			var h hash.Hash
 			switch algorithm {
 			case "md5":
-				h = md5.New() // #nosec G401 -- MD5 used for non-security checksum only
+				h = md5.New() // nox:ignore CRYPTO-001 -- MD5 used for non-security checksum only; #nosec G401 -- MD5 used for non-security checksum only
 			case "sha256":
 				h = sha256.New()
 			case "sha512":

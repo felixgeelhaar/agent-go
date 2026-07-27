@@ -101,7 +101,7 @@ func (s *ArtifactStore) Store(ctx context.Context, content io.Reader, opts artif
 	var hasher hash.Hash
 	reader := content
 	if opts.ComputeChecksum {
-		hasher = md5.New()
+		hasher = md5.New() // nox:ignore CRYPTO-001 -- MD5 is the integrity checksum the Cloud Storage API itself specifies for uploads; it guards against transmission corruption on a TLS-protected channel, not against an adversary
 		reader = io.TeeReader(content, hasher)
 	}
 
