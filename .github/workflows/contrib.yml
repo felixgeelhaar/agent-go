@@ -12,7 +12,9 @@
 #     the workflow's path filter means it doesn't even run.
 #   * Push to main + weekly schedule + manual dispatch: the FULL matrix
 #     runs, so every contrib module is still tested regularly (coverage is
-#     preserved, just not re-run on every unrelated PR).
+#     preserved, just not re-run on every unrelated PR). "Every" is meant
+#     literally now — the module list is discovered from the filesystem, not
+#     enumerated by hand. See the comment on ALL in the discover job.
 #   * Benchmarks moved OFF pull requests to push/schedule only.
 #
 # TRADE-OFF: a PR that changes only core code (domain/, application/, ...)
@@ -61,11 +63,26 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          # Canonical module sets (source of truth for what gets tested).
-          STORAGE="storage-badger storage-dynamodb storage-etcd storage-gcs storage-mongodb storage-nats storage-postgres storage-redis storage-sqlite"
-          ENH="approval-slack dashboard distributed mcp otel planner-llm"
-          PACKS="pack-archive pack-compression pack-ascii pack-base64 pack-case pack-code pack-diff pack-hash pack-markdown pack-pluralize pack-regex pack-similarity pack-slug pack-string pack-template pack-html pack-json pack-xml pack-yaml pack-ast pack-changelog pack-docs pack-license pack-openapi pack-semver pack-cache pack-calendar pack-chunker pack-collection pack-color pack-config pack-convert pack-cron pack-env pack-math pack-path pack-prompt pack-random pack-rate pack-retry pack-scheduler pack-stats pack-testing pack-time pack-uuid pack-validate pack-api pack-browser pack-dns pack-graphql pack-grpc pack-http pack-ip pack-network pack-scrape pack-sse pack-url pack-useragent pack-websocket pack-ci pack-cloud pack-database pack-docker pack-filesystem pack-fileops pack-git pack-kubernetes pack-process pack-shell pack-sql pack-ssh pack-terraform pack-email pack-messaging pack-mqtt pack-notification pack-slack pack-embeddings pack-llm pack-model pack-rag pack-vectordb pack-tokenizer pack-audio pack-chart pack-image pack-ocr pack-pdf pack-qrcode pack-spreadsheet pack-video pack-visualization pack-copilot pack-github pack-jira pack-linear pack-crypto pack-jwt pack-password pack-secrets pack-analytics pack-dataframe pack-etl pack-finance pack-metrics pack-monitoring pack-payments pack-search pack-country pack-geo pack-phone pack-emoji pack-gpio pack-serial pack-crm pack-creditcard pack-fuzzy pack-mime pack-sysinfo"
-          ALL="$STORAGE $ENH $PACKS"
+          # The module list is DISCOVERED, not enumerated. It used to be three
+          # hand-maintained variables (STORAGE / ENH / PACKS) whose union was
+          # called ALL and described in the header as "every contrib module".
+          # It was not: seven modules on disk had never been added to it, so
+          # they had never been tested by any run — and two of them,
+          # contrib/ai and contrib/aiplugin, did not even compile. Their tests
+          # still imported go.klarlabs.de/statekit/ai and .../aiplugin, the
+          # upstream packages statekit v1.9.0 removed and rehomed into these
+          # very modules. Nothing failed, because nothing ran them.
+          #
+          # A list that must be edited by hand every time a module is added
+          # will eventually not be, and the failure is invisible: the matrix
+          # goes green having tested a subset it never claimed was a subset.
+          # So ask the filesystem instead. Anything with a go.mod under
+          # contrib/ is a contrib module and gets tested.
+          ALL=$(find contrib -mindepth 2 -maxdepth 2 -name go.mod -print \
+                | awk -F/ '{print $2}' | sort)
+
+          # Storage modules run with -short: they gate on external services.
+          STORAGE=$(printf '%s\n' $ALL | grep '^storage-' || true)
 
           if [ "$EVENT" = "pull_request" ]; then
             changed=$(git diff --name-only "$BASE_SHA" HEAD -- 'contrib/**' | awk -F/ 'NF>1 {print $2}' | sort -u)
@@ -83,7 +100,7 @@ jobs:
           inc=""
           for m in $sel; do
             short=false
-            case " $STORAGE " in *" $m "*) short=true ;; esac
+            case " $(printf '%s ' $STORAGE) " in *" $m "*) short=true ;; esac
             inc="$inc{\"module\":\"$m\",\"short\":$short},"
           done
           inc="${inc%,}"

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"go.klarlabs.de/statekit"
-	"go.klarlabs.de/statekit/aiplugin"
+	"go.klarlabs.de/agent/contrib/aiplugin"
 	"go.klarlabs.de/statekit/plugin"
 )
 

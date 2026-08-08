@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"go.klarlabs.de/statekit"
-	"go.klarlabs.de/statekit/ai"
+	"go.klarlabs.de/agent/contrib/ai"
 )
 
 type ctx struct {
