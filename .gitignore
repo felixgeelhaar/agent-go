@@ -33,6 +33,13 @@ Thumbs.db
 /bin/
 /dist/
 /agent
+
+# `go build ./...` inside cmd/agentctl writes cmd/agentctl/agentctl over the
+# tracked file of the same name, so building there silently dirties the tree.
+# `/agent` above covers the root binary by path; this is the same fix for the
+# one under cmd/. Extension patterns cannot catch either — a Go binary has no
+# extension.
+/cmd/agentctl/agentctl
 .relicta/
 .roady/
 .playwright-mcp/
