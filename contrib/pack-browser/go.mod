@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/chromedp/cdproto v0.0.0-20250222051814-50c6cb17f10a
 	github.com/chromedp/chromedp v0.13.1
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -16,5 +16,3 @@ require (
 	github.com/gobwas/ws v1.4.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

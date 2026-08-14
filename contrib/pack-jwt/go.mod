@@ -4,7 +4,5 @@ go 1.26.2
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
-
-replace go.klarlabs.de/agent => ../..

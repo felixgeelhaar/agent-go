@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	go.etcd.io/etcd/api/v3 v3.5.21
 	go.etcd.io/etcd/client/v3 v3.5.21
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -26,5 +26,3 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

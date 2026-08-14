@@ -3,7 +3,7 @@ module go.klarlabs.de/agent/contrib/otel
 go 1.26.2
 
 require (
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0
@@ -32,5 +32,3 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

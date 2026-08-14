@@ -3,7 +3,7 @@ module go.klarlabs.de/agent/contrib/pack-grpc
 go 1.26.2
 
 require (
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 	google.golang.org/grpc v1.82.1
 )
 
@@ -15,5 +15,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260504160031-60b97b32f348 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

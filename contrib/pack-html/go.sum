@@ -1,2 +1,4 @@
+go.klarlabs.de/agent v0.15.0 h1:2g7AwPkQuUoLmli/0JlmDGR/mhtPGCsqt8bSpxFp98A=
+go.klarlabs.de/agent v0.15.0/go.mod h1:bv1jLH8B+vHpGLq0HH66L1evUGHpvWMy2wYgmBJn0Lk=
 golang.org/x/net v0.57.0 h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
 golang.org/x/net v0.57.0/go.mod h1:KpXc8iv+r3XplLAG/f7Jsf9RPszJzdR0f58q9vGOuEU=

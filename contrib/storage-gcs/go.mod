@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	cloud.google.com/go/storage v1.50.0
 	github.com/google/uuid v1.6.0
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -58,5 +58,3 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

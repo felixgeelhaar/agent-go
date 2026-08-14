@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/shirou/gopsutil/v3 v3.24.5
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -19,5 +19,3 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..
