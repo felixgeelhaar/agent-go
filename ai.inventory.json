@@ -1,0 +1,510 @@
+{
+  "schema_version": "2.0.0",
+  "components": [
+    {
+      "name": "CLAUDE.md",
+      "type": "ai_component",
+      "path": "CLAUDE.md"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "CLAUDE.md"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "cmd/agentctl/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "cmd/agentctl/repl.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "cmd/agentctl/root.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/approval-cli/approver.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/approval-slack/approver.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/approval-webhook/approver.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/dashboard/server.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/distributed/worker.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/mcp/server.go"
+    },
+    {
+      "name": "mcp",
+      "type": "mcp_runtime",
+      "path": "contrib/mcp/server.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/otel/tracer.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-analytics/analytics.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-api/api.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-audio/audio.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-calendar/calendar.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-ci/ci.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-cloud/cloud.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-code/code.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-copilot/adapter.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-copilot/converter.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-copilot/copilot.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-crm/crm.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-database/database.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-docker/docker.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-docs/docs.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-email/email.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-embeddings/embeddings.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-etl/etl.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-fileops/fileops.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-filesystem/filesystem.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-git/git.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-github/github.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-gpio/gpio.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-http/http.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-image/image.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-jira/jira.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-kubernetes/kubernetes.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-linear/linear.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-llm/llm.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-messaging/messaging.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-model/model.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-monitoring/monitoring.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-mqtt/mqtt.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-network/network.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-notification/notification.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-ocr/ocr.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-payments/payments.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-pdf/pdf.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-rag/rag.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-scrape/scrape.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-search/search.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-secrets/secrets.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-serial/serial.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-shell/shell.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-slack/slack.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-sql/sql.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-terraform/terraform.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-testing/testing.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-vectordb/vectordb.go"
+    },
+    {
+      "name": "pgvector",
+      "type": "vector_store",
+      "path": "contrib/pack-vectordb/vectordb.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-video/video.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/pack-visualization/visualization.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/planner-llm/planner.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/planner-llm/providers/copilot.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-badger/badger.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-dynamodb/dynamodb.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-etcd/etcd.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-gcs/gcs.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-mongodb/config.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-nats/nats.go"
+    },
+    {
+      "name": "pgvector",
+      "type": "vector_store",
+      "path": "contrib/storage-postgres/knowledge_store.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "contrib/storage-sqlite/sqlite.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "domain/metrics/metrics.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/01-minimal/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/customer-support/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/devops-monitor/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/fileops/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/flagship/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/webscraper/main.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "example/webscraper/tools.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/config/loader.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/config/schema.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/governance/axi.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/governance/doc.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/governance/governance.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/governance/kernel.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "infrastructure/notification/sender.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "interfaces/api/agent.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "interfaces/api/config.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "interfaces/api/metrics.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "interfaces/api/notification.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "version.go"
+    },
+    {
+      "name": "agent-go",
+      "type": "agent_framework",
+      "path": "website-astro/astro.config.mjs"
+    }
+  ],
+  "model_provenance": [
+    {
+      "name": "gpt-4",
+      "license": "Proprietary (OpenAI)",
+      "registry": "openai",
+      "path": "contrib/planner-llm/planner.go",
+      "pinned": false
+    },
+    {
+      "name": "claude-sonnet-4-20250514",
+      "license": "Proprietary (Anthropic)",
+      "registry": "anthropic",
+      "path": "example/04-llm-planner/main.go",
+      "pinned": false
+    }
+  ],
+  "prompt_templates": [
+    {
+      "name": "system_message",
+      "type": "system",
+      "path": "contrib/pack-prompt/prompt.go",
+      "line": 413
+    },
+    {
+      "name": "user_message",
+      "type": "user",
+      "path": "contrib/pack-prompt/prompt.go",
+      "line": 427
+    }
+  ]
+}

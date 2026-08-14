@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/dgraph-io/badger/v4 v4.7.0
 	github.com/google/uuid v1.6.0
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -24,5 +24,3 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

@@ -1,2 +1,4 @@
 github.com/yuin/goldmark v1.8.4 h1:oat/nd3U6NeQqFEL3xpEJq7d7c86NI+DbSNGAs4xnjA=
 github.com/yuin/goldmark v1.8.4/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
+go.klarlabs.de/agent v0.15.0 h1:2g7AwPkQuUoLmli/0JlmDGR/mhtPGCsqt8bSpxFp98A=
+go.klarlabs.de/agent v0.15.0/go.mod h1:bv1jLH8B+vHpGLq0HH66L1evUGHpvWMy2wYgmBJn0Lk=

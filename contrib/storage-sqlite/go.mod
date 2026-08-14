@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/google/uuid v1.6.0
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 	modernc.org/sqlite v1.37.1
 )
 
@@ -21,5 +21,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

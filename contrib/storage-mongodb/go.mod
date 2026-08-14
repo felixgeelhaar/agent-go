@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/google/uuid v1.6.0
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 	go.mongodb.org/mongo-driver v1.17.7
 )
 
@@ -21,5 +21,3 @@ require (
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..

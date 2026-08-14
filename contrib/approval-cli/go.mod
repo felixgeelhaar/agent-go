@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/stretchr/testify v1.11.1
-	go.klarlabs.de/agent v0.0.0
+	go.klarlabs.de/agent v0.15.0
 )
 
 require (
@@ -13,5 +13,3 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..
