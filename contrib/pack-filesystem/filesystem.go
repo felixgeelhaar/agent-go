@@ -58,6 +58,9 @@ func Pack(baseDir string) *pack.Pack {
 // safePath resolves a user-provided path relative to baseDir and ensures
 // it does not escape the sandbox. Returns the absolute path or an error.
 func safePath(baseDir, userPath string) (string, error) {
+	if filepath.IsAbs(userPath) {
+		return "", fmt.Errorf("path traversal attempt: %s", userPath)
+	}
 	fullPath := filepath.Join(baseDir, filepath.Clean(userPath))
 	if !isSubPath(baseDir, fullPath) {
 		return "", fmt.Errorf("path traversal attempt: %s", userPath)
