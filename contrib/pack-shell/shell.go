@@ -27,6 +27,7 @@ import (
 	"go.klarlabs.de/agent/domain/agent"
 	"go.klarlabs.de/agent/domain/pack"
 	"go.klarlabs.de/agent/domain/tool"
+	"go.klarlabs.de/agent/sandbox"
 )
 
 // Common errors.
@@ -84,11 +85,7 @@ func Pack(cfg Config) *pack.Pack {
 	}
 	cfg.BaseDir = abs
 
-	allowed := make(map[string]struct{}, len(cfg.Allowlist))
-	for _, a := range cfg.Allowlist {
-		allowed[a] = struct{}{}
-	}
-	p := &shellPack{cfg: cfg, allowed: allowed, jobs: make(map[string]*bgJob)}
+	p := &shellPack{cfg: cfg, jobs: make(map[string]*bgJob)}
 	return pack.NewBuilder("shell").
 		WithDescription("Allowlisted shell command execution tools").
 		WithVersion("0.1.0").
@@ -102,8 +99,7 @@ func Pack(cfg Config) *pack.Pack {
 }
 
 type shellPack struct {
-	cfg     Config
-	allowed map[string]struct{}
+	cfg Config
 
 	mu   sync.Mutex
 	jobs map[string]*bgJob
@@ -146,31 +142,25 @@ func decode[T any](raw json.RawMessage) (T, error) {
 }
 
 func (p *shellPack) isAllowed(cmdPath string) bool {
-	base := filepath.Base(cmdPath)
-	if _, ok := p.allowed[cmdPath]; ok {
-		return true
-	}
-	if _, ok := p.allowed[base]; ok {
-		return true
-	}
-	return false
+	return sandbox.CommandAllowed(cmdPath, p.cfg.Allowlist)
 }
 
 func (p *shellPack) resolveCwd(userCwd string) (string, error) {
-	cwd := p.cfg.BaseDir
-	if userCwd != "" {
-		if filepath.IsAbs(userCwd) {
-			cwd = filepath.Clean(userCwd)
-		} else {
-			cwd = filepath.Join(p.cfg.BaseDir, filepath.Clean(userCwd))
-		}
+	if userCwd == "" {
+		return p.cfg.BaseDir, nil
 	}
-	abs, err := filepath.Abs(cwd)
+	if !filepath.IsAbs(userCwd) {
+		abs, err := sandbox.SafePath(p.cfg.BaseDir, userCwd)
+		if err != nil {
+			return "", fmt.Errorf("%w: %s", ErrInvalidCwd, userCwd)
+		}
+		return abs, nil
+	}
+	abs, err := filepath.Abs(filepath.Clean(userCwd))
 	if err != nil {
 		return "", err
 	}
-	rel, err := filepath.Rel(p.cfg.BaseDir, abs)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if !sandbox.IsUnderBase(p.cfg.BaseDir, abs) {
 		return "", fmt.Errorf("%w: %s", ErrInvalidCwd, userCwd)
 	}
 	return abs, nil

@@ -17,6 +17,7 @@ import (
 	"go.klarlabs.de/agent/domain/knowledge"
 	"go.klarlabs.de/agent/domain/ledger"
 	"go.klarlabs.de/agent/domain/middleware"
+	domainplanner "go.klarlabs.de/agent/domain/planner"
 	"go.klarlabs.de/agent/domain/policy"
 	"go.klarlabs.de/agent/domain/run"
 	"go.klarlabs.de/agent/domain/task"
@@ -25,7 +26,6 @@ import (
 	"go.klarlabs.de/agent/infrastructure/governance"
 	"go.klarlabs.de/agent/infrastructure/logging"
 	inframw "go.klarlabs.de/agent/infrastructure/middleware"
-	"go.klarlabs.de/agent/infrastructure/planner"
 	"go.klarlabs.de/agent/infrastructure/resilience"
 	"go.klarlabs.de/agent/infrastructure/statemachine"
 )
@@ -33,7 +33,7 @@ import (
 // Engine is the main orchestration service for agent execution.
 type Engine struct {
 	registry      tool.Registry
-	planner       planner.Planner
+	planner       domainplanner.Planner
 	executor      *resilience.Executor
 	artifacts     artifact.Store
 	knowledge     knowledge.Store
@@ -61,7 +61,7 @@ type Engine struct {
 // EngineConfig contains configuration for the engine.
 type EngineConfig struct {
 	Registry     tool.Registry
-	Planner      planner.Planner
+	Planner      domainplanner.Planner
 	Executor     *resilience.Executor
 	Artifacts    artifact.Store
 	Knowledge    knowledge.Store
@@ -98,6 +98,11 @@ type EngineConfig struct {
 	// strict audit is enabled whenever EventStore is configured. Strict mode
 	// fails the run if EventStore.Append or RunStore Save/Update returns an
 	// error, instead of logging and continuing.
+	//
+	// Audit clarity: the per-run ledger created by the engine is ephemeral
+	// (in-memory for that run only). Durable, queryable audit requires an
+	// EventStore (and optionally a RunStore). Prefer WithEventStore in
+	// production; without it there is no durable audit trail.
 	StrictAudit *bool
 }
 
@@ -759,7 +764,7 @@ func (e *Engine) step(ctx context.Context, interp *statemachine.Interpreter, mac
 	allowedTools := interp.AllowedTools()
 
 	// Request decision from planner
-	req := planner.PlanRequest{
+	req := domainplanner.PlanRequest{
 		RunID:              run.ID,
 		Goal:               run.Goal,
 		CurrentState:       run.CurrentState,
@@ -1226,11 +1231,11 @@ func (e *Engine) generateRunID() string {
 }
 
 // buildToolDefs converts allowed tool names into ToolDef structs for the planner.
-func (e *Engine) buildToolDefs(allowedTools []string) []planner.ToolDef {
-	defs := make([]planner.ToolDef, 0, len(allowedTools))
+func (e *Engine) buildToolDefs(allowedTools []string) []domainplanner.ToolDef {
+	defs := make([]domainplanner.ToolDef, 0, len(allowedTools))
 	for _, name := range allowedTools {
 		if t, ok := e.registry.Get(name); ok {
-			defs = append(defs, planner.ToolDef{
+			defs = append(defs, domainplanner.ToolDef{
 				Name:        t.Name(),
 				Description: t.Description(),
 				InputSchema: t.InputSchema().Raw(),

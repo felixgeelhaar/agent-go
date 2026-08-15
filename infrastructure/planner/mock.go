@@ -3,44 +3,19 @@ package planner
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"go.klarlabs.de/agent/domain/agent"
-	"go.klarlabs.de/agent/domain/policy"
+	domainplanner "go.klarlabs.de/agent/domain/planner"
 )
 
-// ToolDef describes a tool available for planning decisions.
-type ToolDef struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"input_schema,omitempty"`
-}
-
-// PlanRequest contains all information needed for planning.
-type PlanRequest struct {
-	RunID        string
-	Goal         string
-	CurrentState agent.State
-	Evidence     []agent.Evidence
-	AllowedTools []string
-	// AllowedTransitions lists the states reachable from CurrentState under the
-	// transition policy. Planners should only emit a transition to one of these
-	// (analogous to AllowedTools), so the LLM picks a valid next state instead
-	// of guessing one the machine cannot perform.
-	AllowedTransitions []agent.State
-	ToolDefs           []ToolDef
-	Budgets            policy.BudgetSnapshot
-	Vars               map[string]any
-	// Feedback is a one-shot note from the engine about the previous step —
-	// e.g. that a transition was rejected — so the planner can self-correct.
-	Feedback string
-}
-
-// Planner is the interface for decision engines.
-type Planner interface {
-	Plan(ctx context.Context, req PlanRequest) (agent.Decision, error)
-}
+// Re-export domain planner contracts so existing infrastructure imports keep
+// compiling. New code should use domain/planner (or interfaces/api) directly.
+type (
+	ToolDef     = domainplanner.ToolDef
+	PlanRequest = domainplanner.PlanRequest
+	Planner     = domainplanner.Planner
+)
 
 // MockPlanner returns a predefined sequence of decisions for testing.
 type MockPlanner struct {
@@ -58,7 +33,7 @@ func NewMockPlanner(decisions ...agent.Decision) *MockPlanner {
 }
 
 // Plan returns the next decision in the sequence.
-func (p *MockPlanner) Plan(_ context.Context, _ PlanRequest) (agent.Decision, error) {
+func (p *MockPlanner) Plan(_ context.Context, _ domainplanner.PlanRequest) (agent.Decision, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

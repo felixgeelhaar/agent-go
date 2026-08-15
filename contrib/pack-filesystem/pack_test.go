@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"go.klarlabs.de/agent/domain/tool"
+	"go.klarlabs.de/agent/sandbox"
 )
 
 func TestPack_RegistersTools(t *testing.T) {
@@ -267,8 +268,8 @@ func TestIsSubPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := isSubPath(tc.base, tc.path); got != tc.expected {
-				t.Errorf("isSubPath(%q, %q) = %v, want %v", tc.base, tc.path, got, tc.expected)
+			if got := sandbox.IsUnderBase(tc.base, tc.path); got != tc.expected {
+				t.Errorf("sandbox.IsUnderBase(%q, %q) = %v, want %v", tc.base, tc.path, got, tc.expected)
 			}
 		})
 	}

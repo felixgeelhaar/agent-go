@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"go.klarlabs.de/agent/domain/agent"
 	"go.klarlabs.de/agent/domain/pack"
 	"go.klarlabs.de/agent/domain/tool"
+	"go.klarlabs.de/agent/sandbox"
 )
 
 const (
@@ -95,25 +95,7 @@ func decode[T any](raw json.RawMessage) (T, error) {
 }
 
 func (p *monPack) hostAllowed(host string) bool {
-	host = strings.ToLower(host)
-	// strip port
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	for _, allowed := range p.cfg.AllowedHosts {
-		allowed = strings.ToLower(allowed)
-		if strings.HasPrefix(allowed, "*.") {
-			suf := allowed[1:] // ".example.com"
-			if host == allowed[2:] || strings.HasSuffix(host, suf) {
-				return true
-			}
-			continue
-		}
-		if host == allowed {
-			return true
-		}
-	}
-	return false
+	return sandbox.HostAllowed(host, p.cfg.AllowedHosts)
 }
 
 func (p *monPack) validateURL(raw string) (*url.URL, error) {
