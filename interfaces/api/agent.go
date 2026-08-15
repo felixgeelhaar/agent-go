@@ -800,7 +800,6 @@ var NewPassthroughFactory = governance.NewPassthroughFactory
 // approval to axi while keeping run-level budget in agent-go (the default).
 var NewAxiFactory = governance.NewAxiFactory
 
-
 // Clock abstracts the source of wall-clock time for the runtime.
 type Clock = clock.Clock
 
