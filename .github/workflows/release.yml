@@ -23,11 +23,31 @@ jobs:
           go-version: '1.26'
           cache: true
 
-      - name: Run tests
+      - name: Run core tests
         run: go test -race ./...
+
+      - name: Run contrib tests
+        # Release must cover contrib modules, not only the root module.
+        # Storage modules use -short (they gate on external services), matching
+        # the Contrib workflow matrix.
+        run: |
+          set -euo pipefail
+          go work sync
+          for dir in contrib/*/; do
+            m=$(basename "$dir")
+            echo "== testing contrib/$m =="
+            if [[ "$m" == storage-* ]]; then
+              (cd "$dir" && go test -race -short -timeout=5m ./...)
+            else
+              (cd "$dir" && go test -race -timeout=5m ./...)
+            fi
+          done
 
       - name: Build
         run: go build ./...
+
+      - name: Build contrib
+        run: make contrib-build
 
       - name: Verify module
         run: |
