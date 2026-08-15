@@ -161,7 +161,12 @@ func NewEngine(config EngineConfig) (*Engine, error) {
 		e.executor = resilience.NewExecutorWithOptions(resilience.WithClock(e.clock))
 	}
 	if e.eligibility == nil {
-		e.eligibility = policy.NewToolEligibility()
+		// Sensible onboarding default: allow all registered tools in
+		// explore/decide/act/validate (wildcard "*"). Intake and terminal
+		// states still deny tools. Callers who want deny-by-default should
+		// pass policy.NewToolEligibility() (empty) or an explicit allow-list
+		// via WithToolEligibility / WithEligibility.
+		e.eligibility = policy.NewDefaultToolEligibility()
 	}
 	if e.transitions == nil {
 		e.transitions = policy.DefaultTransitions()

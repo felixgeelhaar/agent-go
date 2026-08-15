@@ -20,7 +20,7 @@ go run main.go
 
 ```
 === Tools Example ===
-Status: done
+Status: completed
 Steps: 5
 
 Output file contents: Processed output!

@@ -45,7 +45,7 @@ Goal: What is 15 multiplied by 7?
   [calculate] multiply(15, 7) = 105
 
 === Result ===
-Status: done
+Status: completed
 Steps: 3
 Result: {"answer": 105, "explanation": "15 × 7 = 105"}
 ```

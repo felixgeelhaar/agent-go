@@ -7,8 +7,10 @@
 **Build trustworthy AI agents in Go.** A state-driven runtime where intelligence is constrained by design, not hope. Works great for a **single agent** — scales to **multi-agent systems** when you're ready.
 
 ```go
+import agent "go.klarlabs.de/agent/interfaces/api"
+
 engine, _ := agent.New(
-    agent.WithTools(readFile, writeFile),
+    agent.WithTool(readFile),
     agent.WithPlanner(llmPlanner),
     agent.WithBudget("tool_calls", 50),
 )
@@ -77,7 +79,7 @@ interfaces/api/     → Public API (5 lines to get started)
 application/        → Engine (Run, Stream, Replay, Fork)
 domain/             → Pure types (State, Decision, Tool, Policy, Protocol)
 infrastructure/     → Implementations (statekit, fortify, storage, planner)
-contrib/            → 134 optional modules (storage, tools, enhancements)
+contrib/            → 141 optional modules (storage, tools, enhancements)
 ```
 
 ---
@@ -86,8 +88,12 @@ contrib/            → 134 optional modules (storage, tools, enhancements)
 
 ### Installation
 
+Requires **Go 1.26.2+** (module floor; see `CONTRIBUTING.md`).
+
 ```bash
-go get go.klarlabs.de/agent
+mkdir my-first-agent && cd my-first-agent
+go mod init my-first-agent
+go get go.klarlabs.de/agent/interfaces/api@latest
 ```
 
 ### Your First Agent (5 minutes)
@@ -120,7 +126,8 @@ func main() {
         }).
         MustBuild()
 
-    // 2. Create a scripted planner (for testing - swap with LLM in production)
+    // 2. Create a scripted planner (for testing — swap with an LLM planner in production)
+    // Canonical flow: intake → explore → decide → done (Finish is only valid from decide/validate).
     planner := agent.NewScriptedPlanner(
         agent.ScriptStep{
             ExpectState: agent.StateIntake,
@@ -132,11 +139,17 @@ func main() {
         },
         agent.ScriptStep{
             ExpectState: agent.StateExplore,
+            Decision:    agent.NewTransitionDecision(agent.StateDecide, "ready to finish"),
+        },
+        agent.ScriptStep{
+            ExpectState: agent.StateDecide,
             Decision:    agent.NewFinishDecision("completed", json.RawMessage(`{"status":"done"}`)),
         },
     )
 
     // 3. Build and run the engine
+    // Default tool eligibility allows registered tools in explore/decide/act/validate.
+    // For production, prefer an explicit allow-list via WithToolEligibility.
     engine, err := agent.New(
         agent.WithTool(greetTool),
         agent.WithPlanner(planner),
@@ -158,11 +171,13 @@ func main() {
 
 Run it:
 ```bash
-go run main.go
+go run .
 # Output:
-# Status: done
+# Status: completed
 # Result: {"status":"done"}
 ```
+
+Or try the in-repo minimal example: `go run ./example/01-minimal`
 
 ---
 
