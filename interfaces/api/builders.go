@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.klarlabs.de/agent/domain/agent"
+	domainplanner "go.klarlabs.de/agent/domain/planner"
 	"go.klarlabs.de/agent/domain/policy"
 	domaintool "go.klarlabs.de/agent/domain/tool"
 	"go.klarlabs.de/agent/infrastructure/planner"
@@ -59,7 +60,7 @@ func NewRuleBasedPlanner(fallback Decision, rules ...planner.Rule) *planner.Rule
 
 // NewHybridPlanner creates a hybrid planner that tries rules first,
 // then falls back to the given planner when no rule matches.
-func NewHybridPlanner(rules *planner.RuleBasedPlanner, fallback planner.Planner) *planner.HybridPlanner {
+func NewHybridPlanner(rules *planner.RuleBasedPlanner, fallback domainplanner.Planner) *planner.HybridPlanner {
 	return planner.NewHybridPlanner(rules, fallback)
 }
 

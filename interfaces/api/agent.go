@@ -99,6 +99,7 @@ import (
 	"go.klarlabs.de/agent/domain/event"
 	"go.klarlabs.de/agent/domain/knowledge"
 	"go.klarlabs.de/agent/domain/middleware"
+	domainplanner "go.klarlabs.de/agent/domain/planner"
 	"go.klarlabs.de/agent/domain/policy"
 	"go.klarlabs.de/agent/domain/protocol"
 	"go.klarlabs.de/agent/domain/run"
@@ -108,7 +109,6 @@ import (
 	"go.klarlabs.de/agent/infrastructure/governance"
 	"go.klarlabs.de/agent/infrastructure/logging"
 	inframw "go.klarlabs.de/agent/infrastructure/middleware"
-	"go.klarlabs.de/agent/infrastructure/planner"
 	"go.klarlabs.de/agent/infrastructure/resilience"
 	"go.klarlabs.de/agent/infrastructure/storage/memory"
 )
@@ -126,6 +126,16 @@ type (
 
 	// Evidence represents an observation during a run.
 	Evidence = agent.Evidence
+
+	// Planner is the decision-engine contract (domain). Implementations may live
+	// in infrastructure or external packages; callers need not import infra.
+	Planner = domainplanner.Planner
+
+	// PlanRequest is the input to Planner.Plan.
+	PlanRequest = domainplanner.PlanRequest
+
+	// ToolDef describes a tool for planning.
+	ToolDef = domainplanner.ToolDef
 
 	// Tool represents a registered capability the agent can invoke.
 	Tool = tool.Tool
@@ -430,7 +440,7 @@ func (e *Engine) Knowledge() knowledge.Store {
 // engineConfig holds configuration for engine creation.
 type engineConfig struct {
 	registry      tool.Registry
-	planner       planner.Planner
+	planner       domainplanner.Planner
 	executor      *resilience.Executor
 	artifacts     artifact.Store
 	knowledge     knowledge.Store
@@ -473,7 +483,7 @@ func WithTool(t tool.Tool) Option {
 }
 
 // WithPlanner sets the planner.
-func WithPlanner(p planner.Planner) Option {
+func WithPlanner(p domainplanner.Planner) Option {
 	return func(c *engineConfig) {
 		c.planner = p
 	}
@@ -706,8 +716,11 @@ func WithRunStore(s run.Store) Option {
 }
 
 // WithEventStore sets the event store for event sourcing and streaming.
-// Required for the Stream() method to work. When an event store is configured,
-// strict audit is enabled by default (Append failures fail the run).
+// Required for Stream(), Replay, and Fork. When configured, strict audit is
+// enabled by default (Append failures fail the run).
+//
+// Audit clarity: the engine's per-run ledger is ephemeral. EventStore is the
+// durable audit trail — configure it in production if you need queryable history.
 func WithEventStore(s event.Store) Option {
 	return func(c *engineConfig) {
 		c.eventStore = s

@@ -33,11 +33,17 @@ test-core:
 	go test -race -v ./domain/... ./application/... ./interfaces/... ./infrastructure/... ./test/...
 
 # Test all contrib modules individually
+# Storage modules use -short (external service gates), matching CI.
 contrib-test:
 	@echo "Testing contrib modules..."
 	@for dir in contrib/*/; do \
+		m=$$(basename "$$dir"); \
 		echo "Testing $$dir"; \
-		(cd "$$dir" && go test -race ./...) || exit 1; \
+		if echo "$$m" | grep -q '^storage-'; then \
+			(cd "$$dir" && go test -race -short -timeout=5m ./...) || exit 1; \
+		else \
+			(cd "$$dir" && go test -race -timeout=5m ./...) || exit 1; \
+		fi; \
 	done
 	@echo "All contrib module tests passed"
 

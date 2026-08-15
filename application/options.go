@@ -5,13 +5,13 @@ import (
 	"go.klarlabs.de/agent/domain/clock"
 	"go.klarlabs.de/agent/domain/event"
 	"go.klarlabs.de/agent/domain/middleware"
+	domainplanner "go.klarlabs.de/agent/domain/planner"
 	"go.klarlabs.de/agent/domain/policy"
 	"go.klarlabs.de/agent/domain/run"
 	"go.klarlabs.de/agent/domain/task"
 	"go.klarlabs.de/agent/domain/telemetry"
 	"go.klarlabs.de/agent/domain/tool"
 	"go.klarlabs.de/agent/infrastructure/logging"
-	"go.klarlabs.de/agent/infrastructure/planner"
 	"go.klarlabs.de/agent/infrastructure/resilience"
 )
 
@@ -26,7 +26,7 @@ func WithRegistry(r tool.Registry) Option {
 }
 
 // WithPlanner sets the planner.
-func WithPlanner(p planner.Planner) Option {
+func WithPlanner(p domainplanner.Planner) Option {
 	return func(c *EngineConfig) {
 		c.Planner = p
 	}
