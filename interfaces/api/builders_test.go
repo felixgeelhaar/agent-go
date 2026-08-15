@@ -275,6 +275,24 @@ func TestDecisionConstructors(t *testing.T) {
 			t.Errorf("Reason = %v, want failed", d.Fail.Reason)
 		}
 	})
+
+	t.Run("NewAskHumanDecision", func(t *testing.T) {
+		t.Parallel()
+
+		d := api.NewAskHumanDecision("Proceed?", "yes", "no")
+		if d.Type != agent.DecisionAskHuman {
+			t.Errorf("Type = %v, want ask_human", d.Type)
+		}
+		if d.AskHuman == nil {
+			t.Fatal("AskHuman is nil")
+		}
+		if d.AskHuman.Question != "Proceed?" {
+			t.Errorf("Question = %v, want Proceed?", d.AskHuman.Question)
+		}
+		if len(d.AskHuman.Options) != 2 {
+			t.Errorf("Options len = %d, want 2", len(d.AskHuman.Options))
+		}
+	})
 }
 
 func TestNewCallbackApprover(t *testing.T) {

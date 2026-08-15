@@ -73,8 +73,8 @@ Real LLMs are unpredictable. agent-go separates the intelligence layer (Planner)
 // Testing: Use ScriptedPlanner for deterministic behavior
 testPlanner := agent.NewScriptedPlanner(steps...)
 
-// Production: Use LLM planner for real intelligence
-prodPlanner := planner.NewLLMPlanner(config)
+// Production: Use an LLM planner (see contrib/planner-llm)
+prodPlanner := plannerllm.NewPlanner(config)
 
 // Same engine, same behavior guarantees
 engine, _ := agent.New(
