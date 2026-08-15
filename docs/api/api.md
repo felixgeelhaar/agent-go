@@ -20,7 +20,6 @@ Create a minimal agent with a tool and scripted planner:
 
 
 
-
 The agent operates within a canonical state graph:
 
 ## Full API Reference
@@ -55,18 +54,13 @@ Create a minimal agent with a tool and scripted planner:
         api.ScriptStep{ExpectState: api.StateDecide, Decision: api.NewFinishDecision("completed", result)},
     )
 
-    // 3. Configure tool eligibility
-    // Option A: Declarative style (recommended for static configuration)
+    // 3. Configure tool eligibility (optional)
+    // When omitted, the engine uses NewDefaultToolEligibility(): wildcard allow
+    // in explore/decide/act/validate. Prefer an explicit allow-list in production.
     eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
         api.StateExplore: {"echo", "read_file"},
         api.StateAct:     {"write_file"},
     })
-
-    // Option B: Imperative style (useful for dynamic configuration)
-    eligibility := api.NewToolEligibility()
-    eligibility.Allow(api.StateExplore, "echo")
-    eligibility.Allow(api.StateExplore, "read_file")
-    eligibility.Allow(api.StateAct, "write_file")
 
     // 4. Create and run the engine
     engine, _ := api.New(
@@ -169,6 +163,14 @@ const (
 	StatusFailed    = agent.RunStatusFailed
 )
 const (
+	TrustNone     = protocol.TrustNone
+	TrustReadOnly = protocol.TrustReadOnly
+	TrustLimited  = protocol.TrustLimited
+	TrustFull     = protocol.TrustFull
+)
+    Re-export trust levels.
+
+const (
 	// ConfigFormatYAML is the YAML format.
 	ConfigFormatYAML = infraconfig.FormatYAML
 	// ConfigFormatJSON is the JSON format.
@@ -270,8 +272,38 @@ var (
 	// ErrInvalidHumanInput is returned when the provided input doesn't
 	// match the allowed options for the pending question.
 	ErrInvalidHumanInput = agent.ErrInvalidHumanInput
+
+	// ErrNoProgress is returned when loop detection aborts a run: too many
+	// consecutive steps made no progress (no state change and no new evidence).
+	// Tune the threshold with WithMaxNoProgress.
+	ErrNoProgress = agent.ErrNoProgress
+
+	// ErrMaxSteps is returned when a run reaches MaxSteps without entering a
+	// terminal state.
+	ErrMaxSteps = agent.ErrMaxSteps
+
+	// ErrAuditFailed is returned when strict audit is enabled and a configured
+	// EventStore or RunStore fails to persist an audit record.
+	ErrAuditFailed = agent.ErrAuditFailed
+
+	// ErrTransitionRejected indicates a requested transition was rejected by
+	// policy or the state machine. The engine feeds this back to the planner
+	// rather than hard-failing on the first rejection.
+	ErrTransitionRejected = agent.ErrTransitionRejected
+
+	// ErrToolNotAllowed is returned when a tool is not eligible in the current state.
+	ErrToolNotAllowed = tool.ErrToolNotAllowed
 )
     Re-export human input related errors.
+
+var (
+	NewMessage     = protocol.NewRequest
+	NewNotify      = protocol.NewNotify
+	NewBroadcast   = protocol.NewBroadcast
+	NewTrustPolicy = protocol.NewTrustPolicy
+	NewTaskContext = task.NewContext
+)
+    Re-export protocol constructors.
 
 var (
 	// ErrKnowledgeNotFound indicates the requested vector was not found.
@@ -326,6 +358,38 @@ var (
 )
     Notification errors.
 
+var ErrInvalidStep = application.ErrInvalidStep
+    ErrInvalidStep indicates a fork/reconstruct was requested at a step index
+    below 1 (steps are 1-based).
+
+var NewAxiFactory = governance.NewAxiFactory
+    NewAxiFactory returns a factory that delegates only destructive-tool
+    approval to axi while keeping run-level budget in agent-go (the default).
+
+var NewFixedClock = clock.Fixed
+    NewFixedClock returns a deterministic clock that always reports t.
+
+var NewKernelFactory = governance.NewKernelFactory
+    NewKernelFactory returns a factory that fully delegates budget, approval,
+    and evidence to one axi session per run.
+
+var NewLogger = logging.NewLogger
+    NewLogger wraps a bolt.Logger for injection via WithLogger.
+
+var NewLoggerFromConfig = logging.NewLoggerFromConfig
+    NewLoggerFromConfig builds a configured logger without touching the
+    package-level logging singleton.
+
+var NewNopLogger = logging.NewNopLogger
+    NewNopLogger returns a logger that discards all output.
+
+var NewPassthroughFactory = governance.NewPassthroughFactory
+    NewPassthroughFactory returns a factory that keeps budget and approval
+    in-process (approval via engine middleware).
+
+var SystemClock = clock.System
+    SystemClock returns the default time.Now-backed clock.
+
 
 FUNCTIONS
 
@@ -363,6 +427,9 @@ func ExpandEnvStrict(input string) (string, error)
     ExpandEnvStrict expands environment variables and returns an error for
     missing vars.
 
+func NewArtifactStore(basePath string) (artifact.Store, error)
+    NewArtifactStore creates a filesystem artifact store under basePath.
+
 func NewAutoApprover(name string) *policy.AutoApprover
     NewAutoApprover creates an approver that automatically approves all
     requests.
@@ -395,12 +462,11 @@ func NewDenyApprover(reason string) *policy.DenyApprover
 func NewEligibilityGenerator() suggestion.Generator
     NewEligibilityGenerator creates a generator for eligibility suggestions.
 
+func NewEventStore() event.Store
+    NewEventStore creates an in-memory event store for Stream/Replay/Fork.
+
 func NewFailureDetector(eventStore EventStore, runStore RunStore) pattern.Detector
     NewFailureDetector creates a detector for failure patterns.
-
-func NewHybridPlanner(rules *planner.RuleBasedPlanner, fallback planner.Planner) *planner.HybridPlanner
-    NewHybridPlanner creates a hybrid planner that tries rules first, then falls
-    back to the given planner when no rule matches.
 
 func NewInspector(
 	runExporter inspector.RunExporter,
@@ -421,9 +487,6 @@ func NewMemoryCache(maxEntries int) *memory.Cache
 func NewMetricsExporter(runStore RunStore, eventStore EventStore) inspector.MetricsExporter
     NewMetricsExporter creates a new metrics exporter.
 
-func NewMockPlanner(decisions ...Decision) *planner.MockPlanner
-    NewMockPlanner creates a mock planner with predefined decisions.
-
 func NewPatternStore() pattern.Store
     NewPatternStore creates a new in-memory pattern store.
 
@@ -439,18 +502,22 @@ func NewPolicyVersionStore() policy.VersionStore
 func NewProposalStore() proposal.Store
     NewProposalStore creates a new in-memory proposal store.
 
-func NewRule(name string) *planner.RuleBuilder
-    NewRule creates a new rule builder with the given name.
+func NewReplay(eventStore event.Store) *application.Replay
+    NewReplay creates a replay engine for reconstructing historical runs.
+    Requires an EventStore for loading events.
 
-func NewRuleBasedPlanner(fallback Decision, rules ...planner.Rule) *planner.RuleBasedPlanner
-    NewRuleBasedPlanner creates a rule-based planner that evaluates rules in
-    priority order. The fallback decision is returned when no rule matches.
+    Example:
+
+        replay := api.NewReplay(eventStore)
+        run, _ := replay.ReconstructRun(ctx, "run-123")
+        timeline, _ := replay.NewTimeline(ctx, "run-123")
+        fmt.Println("Duration:", timeline.Duration())
 
 func NewRunExporter(runStore RunStore, eventStore EventStore) inspector.RunExporter
     NewRunExporter creates a new run exporter.
 
-func NewScriptedPlanner(steps ...planner.ScriptStep) *planner.ScriptedPlanner
-    NewScriptedPlanner creates a scripted planner for deterministic testing.
+func NewRunStore() run.Store
+    NewRunStore creates an in-memory run store for persisting run snapshots.
 
 func NewSequenceDetector(eventStore EventStore, runStore RunStore) pattern.Detector
     NewSequenceDetector creates a detector for tool sequence patterns.
@@ -550,6 +617,9 @@ type AgentConfig = domainconfig.AgentConfig
 func DefaultAgentConfig() *AgentConfig
     DefaultAgentConfig returns a minimal default configuration.
 
+type AgentDescriptor = protocol.AgentDescriptor
+    AgentDescriptor describes an agent's capabilities and trust level.
+
 type AgentSettings = domainconfig.AgentSettings
     AgentSettings contains core agent behavior settings.
 
@@ -619,6 +689,9 @@ func NewCallbackApprover(fn func(ctx context.Context, req ApprovalRequest) (bool
 func (c *CallbackApprover) Approve(ctx context.Context, req ApprovalRequest) (ApprovalResponse, error)
     Approve processes the approval request using the callback function.
 
+type Capability = protocol.Capability
+    Capability advertises what an agent can do.
+
 type ChangeType = proposal.ChangeType
     ChangeType categorizes the type of policy change.
 
@@ -631,6 +704,9 @@ type CircuitBreakerMetricsRecorder = inframw.CircuitBreakerMetricsRecorder
 func NewCircuitBreakerMetricsRecorder(provider Metrics) CircuitBreakerMetricsRecorder
     NewCircuitBreakerMetricsRecorder creates a recorder for circuit breaker
     metrics.
+
+type Clock = clock.Clock
+    Clock abstracts the source of wall-clock time for the runtime.
 
 type ConfigBuildResult = infraconfig.BuildResult
     ConfigBuildResult contains the built components from configuration.
@@ -669,6 +745,10 @@ func ConfigWithValidation(enabled bool) ConfigLoaderOption
 type Decision = agent.Decision
     Decision represents the planner's output.
 
+func NewAskHumanDecision(question string, options ...string) Decision
+    NewAskHumanDecision creates a decision to pause and ask for human input.
+    Resume with Engine.ResumeWithInput after the operator answers.
+
 func NewCallToolDecision(toolName string, input []byte, reason string) Decision
     NewCallToolDecision creates a decision to execute a tool.
 
@@ -680,6 +760,22 @@ func NewFinishDecision(summary string, result []byte) Decision
 
 func NewTransitionDecision(toState State, reason string) Decision
     NewTransitionDecision creates a decision to transition states.
+
+type DelegateOption = infraagent.DelegateOption
+    DelegateOption configures a DelegateTool.
+
+func WithDelegateRiskLevel(level RiskLevel) DelegateOption
+    WithDelegateRiskLevel sets the risk annotation on the delegate tool.
+
+func WithDelegateTaskContext(tc *TaskContext) DelegateOption
+    WithDelegateTaskContext shares a TaskContext across parent/child runs.
+
+type DelegateTool = infraagent.DelegateTool
+    DelegateTool wraps a child Engine as a tool.
+
+func NewDelegateTool(name, description string, child *Engine, opts ...DelegateOption) *DelegateTool
+    NewDelegateTool wraps child as a tool named name for agent composition.
+    Callers pass *api.Engine; no need to import infrastructure/agent.
 
 type DetectionOptions = pattern.DetectionOptions
     DetectionOptions configures pattern detection.
@@ -709,6 +805,38 @@ type Engine struct {
 
 func New(opts ...Option) (*Engine, error)
     New creates a new Engine with the provided options.
+
+func (e *Engine) ContinueRun(ctx context.Context, run *Run) (*Run, error)
+    ContinueRun drives a reconstructed run (e.g. the result of Fork or a replay)
+    further from its current state. It re-attaches a fresh state machine and
+    per-run governor and resumes the step loop, re-applying the full pipeline:
+    the structural act-gate (side effects only in act), governance authorization
+    (budget + approval), and the event stream. The run's tool-call budget is
+    seeded with the calls already consumed so a continued run does not reset its
+    run-spanning budget. A nil or already-terminal run returns an error.
+
+    Example:
+
+        forked, _ := engine.Fork(ctx, "run-123", 3)
+        final, _ := engine.ContinueRun(ctx, forked)
+
+func (e *Engine) Fork(ctx context.Context, runID string, stepN int) (*Run, error)
+    Fork branches a new run from an existing run's event history at the given
+    step. The source run is reconstructed up to and including its first stepN
+    executed steps (decision boundaries), and that state — goal, variables,
+    evidence, current state — is materialized into a fresh run with a new ID and
+    a lineage link back to the parent. The fork is persisted (when a run store
+    is configured) and a lineage event is written to its event stream.
+
+    Requires an event store (WithEventStore). Pair with WithClock for fully
+    deterministic forks. stepN must be >= 1. The returned run is in its
+    reconstructed state and not yet re-executed — inspect it, or drive it
+    further with ContinueRun.
+
+    Example:
+
+        forked, _ := engine.Fork(ctx, "run-123", 3) // branch after 3 steps
+        forked, _ = engine.ContinueRun(ctx, forked) // resume the branch
 
 func (e *Engine) Knowledge() knowledge.Store
     Knowledge returns the knowledge store, if configured. Returns nil if no
@@ -765,6 +893,9 @@ func FilterByType(types ...EventType) EventFilter
     FilterByType creates a filter that only allows events of the specified
     types.
 
+type EventIterator = application.EventIterator
+    EventIterator steps through events sequentially.
+
 type EventStore = event.Store
     EventStore stores events for pattern detection.
 
@@ -777,11 +908,47 @@ type Evidence = agent.Evidence
 type ExecutionContext = middleware.ExecutionContext
     ExecutionContext contains all information needed for middleware decisions.
 
+type Executor = resilience.Executor
+    Executor is the resilient tool executor. Prefer api.NewDefaultExecutor over
+    importing infrastructure/resilience.
+
+func NewDefaultExecutor() *Executor
+    NewDefaultExecutor returns a resilient executor with default settings.
+
+func NewExecutorWithOptions(opts ...ExecutorOption) *Executor
+    NewExecutorWithOptions returns a resilient executor with the given options.
+
+type ExecutorOption = resilience.Option
+    ExecutorOption configures a resilient executor.
+
+func WithExecutorMaxConcurrent(n int) ExecutorOption
+    WithExecutorMaxConcurrent sets the bulkhead concurrency limit.
+
+func WithExecutorRetryAttempts(n int) ExecutorOption
+    WithExecutorRetryAttempts sets max retries for idempotent tools.
+
+func WithExecutorRetryDelay(d time.Duration) ExecutorOption
+    WithExecutorRetryDelay sets the initial retry backoff delay.
+
+func WithExecutorTimeout(d time.Duration) ExecutorOption
+    WithExecutorTimeout sets the default tool execution timeout.
+
 type ExportFormat = inspector.ExportFormat
     ExportFormat specifies the output format for exports.
 
+type GovernanceFactory = governance.Factory
+    GovernanceFactory constructs per-run governors. Prefer the api constructors
+    below over importing infrastructure/governance.
+
 type Handler = middleware.Handler
     Handler executes a tool and returns its result.
+
+type HybridPlanner = planner.HybridPlanner
+    HybridPlanner tries rules first, then a fallback planner.
+
+func NewHybridPlanner(rules *RuleBasedPlanner, fallback domainplanner.Planner) *HybridPlanner
+    NewHybridPlanner creates a hybrid planner that tries rules first, then falls
+    back to the given planner when no rule matches.
 
 type ImpactLevel = suggestion.ImpactLevel
     ImpactLevel indicates the potential impact of a suggestion.
@@ -818,13 +985,26 @@ func NewLegacyMiddlewareCache(maxEntries int) *LegacyMiddlewareCache
 type ListFilter = knowledge.ListFilter
     ListFilter provides filtering options for knowledge list operations.
 
+type Logger = logging.Logger
+    Logger is the injectable structured logger used by the engine.
+
+type LoggerConfig = logging.Config
+    LoggerConfig configures a logger built via NewLoggerFromConfig.
+
 type LoggingMiddlewareConfig struct {
 	// LogInput logs the tool input (may contain sensitive data).
 	LogInput bool
 	// LogOutput logs the tool output (may be large).
 	LogOutput bool
+	// Logger is the injected structured logger. When nil, the middleware uses
+	// a no-op logger and emits nothing — it never falls back to the
+	// package-level logging singleton. Build one with NewLogger.
+	Logger *logging.Logger
 }
     LoggingMiddlewareConfig configures the logging middleware.
+
+type Message = protocol.Message
+    Message is the envelope for inter-agent communication.
 
 type Metrics = metrics.Metrics
     Metrics is the interface for recording metrics.
@@ -891,6 +1071,12 @@ type MiddlewareRegistry = middleware.Registry
 func NewMiddlewareRegistry() *MiddlewareRegistry
     NewMiddlewareRegistry creates a new middleware registry.
 
+type MockPlanner = planner.MockPlanner
+    MockPlanner is a test planner with a fixed decision sequence.
+
+func NewMockPlanner(decisions ...Decision) *MockPlanner
+    NewMockPlanner creates a mock planner with predefined decisions.
+
 type NoopMetricsProvider = metrics.NoopProvider
     NoopMetricsProvider is a no-op implementation for testing.
 
@@ -916,17 +1102,79 @@ func WithBudget(name string, limit int) Option
 func WithBudgets(budgets map[string]int) Option
     WithBudgets sets budget limits.
 
+func WithClock(c clock.Clock) Option
+    WithClock injects the clock used for run IDs, run start timestamps,
+    and event timestamps. When unset, the system clock is used. Inject a fixed
+    clock or a statekit FakeClock for deterministic replay, fork, and tests.
+
+    Example (deterministic events):
+
+        clk := api.NewFixedClock(time.Unix(0, 0).UTC())
+        engine, _ := api.New(api.WithPlanner(p), api.WithEventStore(store), api.WithClock(clk))
+
 func WithEventStore(s event.Store) Option
     WithEventStore sets the event store for event sourcing and streaming.
-    Required for the Stream() method to work.
+    Required for Stream(), Replay, and Fork. When configured, strict audit is
+    enabled by default (Append failures fail the run).
 
-func WithExecutor(e *resilience.Executor) Option
+    Audit clarity: the engine's per-run ledger is ephemeral. EventStore is the
+    durable audit trail — configure it in production if you need queryable
+    history.
+
+func WithExecutor(e *Executor) Option
     WithExecutor sets the resilient executor.
+
+func WithGovernance(f GovernanceFactory) Option
+    WithGovernance selects the governance backend that enforces act-state tool
+    budget, approval, and the evidence trail. When unset, the engine delegates
+    the destructive-tool approval gate to an axi.Kernel (AxiFactory) while the
+    run-level budget stays in agent-go.
+
+    Use api.NewKernelFactory(approver) for full delegation — each run executes
+    as one axi session so budget, approval, and evidence are all axi-native.
+    Use api.NewPassthroughFactory(approver) to keep budget and approval fully
+    in-process (approval via the engine middleware).
+
+func WithInputValidation(maxInputBytes int) Option
+    WithInputValidation enables an invocation-time input-validation guard that
+    validates each tool input against its JSON schema and, when maxInputBytes
+    > 0, rejects inputs larger than that many bytes. This bounds untrusted or
+    LLM-produced payloads before they reach tool handlers.
+
+    This is structural/schema validation, not prompt-injection content
+    detection: the framework's primary defense against malicious tool use is the
+    structural act-gate, tool eligibility, and governance/approval. For callable
+    field-level validators (email, url, uuid, etc.) use contrib/pack-validate.
+
+    Note: the engine's default middleware chain already performs schema input
+    validation; use this option to add a size bound or when supplying a custom
+    middleware chain.
+
+    Example:
+
+        engine, _ := api.New(
+            api.WithPlanner(planner),
+            api.WithInputValidation(64*1024), // reject tool inputs over 64 KiB
+        )
 
 func WithKnowledgeStore(s knowledge.Store) Option
     WithKnowledgeStore sets the knowledge store for RAG (Retrieval-Augmented
     Generation). The knowledge store enables agents to store and retrieve
     knowledge based on semantic similarity using vector embeddings.
+
+func WithLogger(l *Logger) Option
+    WithLogger injects a structured logger into the engine. When unset,
+    the engine emits no logs and never depends on a global logging singleton.
+
+    Example:
+
+        logger := api.NewLoggerFromConfig(api.LoggerConfig{Level: "info", Format: "json"})
+        engine, _ := api.New(api.WithPlanner(p), api.WithLogger(logger))
+
+func WithMaxNoProgress(n int) Option
+    WithMaxNoProgress sets loop detection: a run is aborted after this many
+    consecutive steps that make no progress (no state change and no new
+    evidence). Zero uses the default (6).
 
 func WithMaxSteps(n int) Option
     WithMaxSteps sets the maximum number of execution steps.
@@ -950,11 +1198,10 @@ func WithMetrics(provider Metrics) Option
         )
 
 func WithMiddleware(middlewares ...middleware.Middleware) Option
-    WithMiddleware sets a custom middleware registry for tool execution.
-    If not set, the engine uses a default middleware chain with: - Eligibility
-    middleware (tool access control per state) - Approval middleware (human
-    approval for destructive tools) - Logging middleware (execution timing and
-    results)
+    WithMiddleware appends middleware to the engine's default policy chain.
+    The default chain always includes validation, eligibility, approval (when
+    governance does not own it), and logging — caller middleware cannot replace
+    those policy gates. Use this for rate limiting, metrics, caching, etc.
 
 func WithPerToolRateLimit(defaultRate, defaultBurst int, toolRates map[string]ToolRateConfig) Option
     WithPerToolRateLimit enables per-tool rate limiting. Each tool can have its
@@ -970,7 +1217,7 @@ func WithPerToolRateLimit(defaultRate, defaultBurst int, toolRates map[string]To
             }),
         )
 
-func WithPlanner(p planner.Planner) Option
+func WithPlanner(p domainplanner.Planner) Option
     WithPlanner sets the planner.
 
 func WithRateLimit(rate, burst int) Option
@@ -994,6 +1241,17 @@ func WithRegistry(r tool.Registry) Option
 func WithRunStore(s run.Store) Option
     WithRunStore sets the run store for persistent run state. Runs are
     automatically saved on creation and updated on each step.
+
+func WithStrictAudit(strict bool) Option
+    WithStrictAudit overrides audit persistence failure handling. When true,
+    EventStore.Append and RunStore Save/Update errors fail the run. When false,
+    persistence errors are logged and the run continues. The default is true
+    whenever an EventStore is configured.
+
+func WithTaskContext(tc *task.Context) Option
+    WithTaskContext sets a shared task context for multi-agent coordination.
+    Enables shared variables, evidence, and artifact references across parent
+    and child agents in a delegation hierarchy.
 
 func WithTool(t tool.Tool) Option
     WithTool registers a tool with the engine's registry. Can be called multiple
@@ -1039,6 +1297,13 @@ func WithLongRunThreshold(d time.Duration) PerformanceDetectorOption
 func WithSlowToolThreshold(d time.Duration) PerformanceDetectorOption
     WithSlowToolThreshold sets the threshold for slow tool detection.
 
+type PlanRequest = domainplanner.PlanRequest
+    PlanRequest is the input to Planner.Plan.
+
+type Planner = domainplanner.Planner
+    Planner is the decision-engine contract (domain). Implementations may live
+    in infrastructure or external packages; callers need not import infra.
+
 type PolicyApplier = infraProposal.PolicyApplier
     PolicyApplier applies approved proposals to policy configuration.
 
@@ -1081,6 +1346,11 @@ type RateLimitMetricsRecorder = inframw.RateLimitMetricsRecorder
 func NewRateLimitMetricsRecorder(provider Metrics) RateLimitMetricsRecorder
     NewRateLimitMetricsRecorder creates a recorder for rate limit metrics.
 
+type Replay = application.Replay
+    Replay provides run reconstruction and timeline analysis from events.
+    It also supports step-bounded reconstruction via ReconstructRunAtStep,
+    the primitive behind Engine.Fork.
+
 type ResilienceConfig = domainconfig.ResilienceConfig
     ResilienceConfig contains resilience settings.
 
@@ -1090,11 +1360,24 @@ type RetryConfigSpec = domainconfig.RetryConfig
 type RiskLevel = tool.RiskLevel
     RiskLevel indicates the potential impact of a tool execution.
 
+type Router = protocol.Router
+    Router dispatches messages between agents.
+
 type Rule = planner.Rule
     Rule is a condition-decision pair for the rule-based planner.
 
+type RuleBasedPlanner = planner.RuleBasedPlanner
+    RuleBasedPlanner evaluates Go-native rules in priority order.
+
+func NewRuleBasedPlanner(fallback Decision, rules ...planner.Rule) *RuleBasedPlanner
+    NewRuleBasedPlanner creates a rule-based planner that evaluates rules in
+    priority order. The fallback decision is returned when no rule matches.
+
 type RuleBuilder = planner.RuleBuilder
     RuleBuilder constructs rules using a fluent API.
+
+func NewRule(name string) *RuleBuilder
+    NewRule creates a new rule builder with the given name.
 
 type Run = agent.Run
     Run represents a single execution of the agent.
@@ -1125,6 +1408,12 @@ type RunStore = run.Store
 
 type ScriptStep = planner.ScriptStep
     ScriptStep is a step in a scripted planner.
+
+type ScriptedPlanner = planner.ScriptedPlanner
+    ScriptedPlanner replays a predetermined script of decisions.
+
+func NewScriptedPlanner(steps ...planner.ScriptStep) *ScriptedPlanner
+    NewScriptedPlanner creates a scripted planner for deterministic testing.
 
 type SearchResult = knowledge.SearchResult
     SearchResult represents a similarity search result.
@@ -1181,6 +1470,12 @@ type SuggestionStore = suggestion.Store
 type SuggestionType = suggestion.SuggestionType
     SuggestionType categorizes suggestions.
 
+type TaskContext = task.Context
+    TaskContext spans a multi-agent task for shared state.
+
+type Timeline = application.Timeline
+    Timeline provides temporal analysis of a run's event history.
+
 type TimelineEntry = inspector.TimelineEntry
     TimelineEntry represents an entry in the run timeline.
 
@@ -1195,6 +1490,9 @@ type ToolCallExport = inspector.ToolCallExport
 
 type ToolCompletedPayload = domainnotif.ToolCompletedPayload
     Re-export domain notification types.
+
+type ToolDef = domainplanner.ToolDef
+    ToolDef describes a tool for planning.
 
 type ToolFailedPayload = domainnotif.ToolFailedPayload
     Re-export domain notification types.
@@ -1242,6 +1540,9 @@ type TransitionRules = policy.TransitionRules
             api.StateExplore:  {api.StateDecide, api.StateFailed},
             api.StateDecide:   {api.StateAct, api.StateDone, api.StateFailed},
         })
+
+type TrustPolicy = protocol.TrustPolicy
+    TrustPolicy defines trust relationships between agents.
 
 type ValidationError = domainconfig.ValidationError
     ValidationError represents a configuration validation error.

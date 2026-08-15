@@ -15,6 +15,14 @@ package artifact // import "go.klarlabs.de/agent/domain/artifact"
 
 Package artifact provides domain models for artifact storage.
 
+CONSTANTS
+
+const MaxIDLength = 255
+    MaxIDLength bounds the length of an artifact ID. Filesystem-backed
+    stores use the ID as a single path component, and 255 bytes is the common
+    per-component limit on Linux and macOS.
+
+
 VARIABLES
 
 var (
@@ -34,6 +42,26 @@ var (
 	ErrChecksumMismatch = errors.New("checksum mismatch")
 )
     Domain errors for artifact storage.
+
+
+FUNCTIONS
+
+func IsValidID(id string) bool
+    IsValidID reports whether id is a well-formed artifact ID.
+
+    A valid ID is non-empty, at most MaxIDLength bytes long, is neither "." nor
+    "..", and consists only of ASCII letters, digits, '-', '_' and '.'.
+
+    The charset is deliberately narrow. Stores use the ID verbatim as a path
+    component (filesystem) or object key (GCS, S3), so path separators,
+    parent directory references and control bytes must never appear in one.
+    A Ref is a plain JSON value that can round-trip through tool output and
+    model-authored input, so an ID arriving at Retrieve/Delete/Exists/Metadata
+    is not necessarily an ID this process generated — validation is the store's
+    contract with its caller, not an assumption it may make.
+
+    The format accepts every ID the bundled stores emit: the filesystem store's
+    "<unix-nanos>-<random>" and the GCS store's UUIDs.
 
 
 TYPES
@@ -66,7 +94,9 @@ func NewRef(id string) Ref
     NewRef creates a new artifact reference.
 
 func (r Ref) IsValid() bool
-    IsValid returns true if the reference has a valid ID.
+    IsValid returns true if the reference carries a well-formed ID.
+
+    See IsValidID for the accepted format.
 
 func (r Ref) String() string
     String returns a string representation of the reference.

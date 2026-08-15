@@ -36,6 +36,27 @@ var (
 	// ErrAwaitingHumanInput indicates the run is paused awaiting human input.
 	ErrAwaitingHumanInput = errors.New("run is awaiting human input")
 
+	// ErrNoProgress indicates the run was aborted by loop detection: too many
+	// consecutive steps made no progress (no state change and no new evidence),
+	// e.g. the planner kept emitting self-transitions or repeats.
+	ErrNoProgress = errors.New("run aborted: no progress (possible loop)")
+
+	// ErrMaxSteps indicates the run was aborted because it reached MaxSteps
+	// without entering a terminal state.
+	ErrMaxSteps = errors.New("max steps exceeded")
+
+	// ErrAuditFailed indicates a configured EventStore or RunStore failed to
+	// persist an audit record. When strict audit is enabled (default whenever
+	// an EventStore is configured), this fails the run rather than silently
+	// dropping the audit trail.
+	ErrAuditFailed = errors.New("audit persistence failed")
+
+	// ErrTransitionRejected indicates a requested transition did not fire: the
+	// policy disallows it, or the state machine has no matching edge from the
+	// current state. The engine surfaces this to the planner as feedback rather
+	// than letting it become a silent no-op.
+	ErrTransitionRejected = errors.New("transition rejected")
+
 	// ErrNoPendingQuestion indicates no pending question exists for human input.
 	ErrNoPendingQuestion = errors.New("run does not have a pending question")
 
@@ -49,7 +70,8 @@ var (
 	ErrCustomStateDuplicate = errors.New("custom state already registered")
 
 	// ErrCustomSideEffectsForbidden indicates a custom state attempted to opt into
-	// side effects. Only the canonical act state may allow side-effecting tools.
+	// side effects. Only the canonical act state may allow side-effecting tools
+	// (design invariant: state semantics).
 	ErrCustomSideEffectsForbidden = errors.New("custom states cannot allow side effects; only act may")
 )
     Domain errors for the agent runtime.
@@ -75,7 +97,7 @@ type CustomState struct {
 	Name State
 
 	// AllowsSideEffects must be false. Only the canonical act state may permit
-	// side-effecting tools; Register rejects true.
+	// side-effecting tools (invariant 5). Register rejects true.
 	AllowsSideEffects bool
 
 	// Terminal indicates whether this is a terminal (final) state.
@@ -132,13 +154,27 @@ type Evidence struct {
     Evidence represents an observation or result accumulated during a run.
 
 func NewHumanEvidence(content json.RawMessage) Evidence
-    NewHumanEvidence creates evidence from human input.
+    NewHumanEvidence creates evidence from human input, stamping the wall clock.
+    The engine uses NewHumanEvidenceAt with an injected clock for determinism.
+
+func NewHumanEvidenceAt(content json.RawMessage, t time.Time) Evidence
+    NewHumanEvidenceAt creates evidence from human input at the given instant.
 
 func NewSystemEvidence(note string) Evidence
-    NewSystemEvidence creates system-generated evidence.
+    NewSystemEvidence creates system-generated evidence, stamping the wall
+    clock. The engine uses NewSystemEvidenceAt with an injected clock for
+    determinism.
+
+func NewSystemEvidenceAt(note string, t time.Time) Evidence
+    NewSystemEvidenceAt creates system-generated evidence at the given instant.
 
 func NewToolEvidence(toolName string, content json.RawMessage) Evidence
-    NewToolEvidence creates evidence from a tool result.
+    NewToolEvidence creates evidence from a tool result, stamping the wall
+    clock. The engine uses NewToolEvidenceAt with an injected clock for
+    determinism.
+
+func NewToolEvidenceAt(toolName string, content json.RawMessage, t time.Time) Evidence
+    NewToolEvidenceAt creates evidence from a tool result at the given instant.
 
 type EvidenceType string
     EvidenceType classifies the source of evidence.
@@ -179,6 +215,14 @@ type Run struct {
 	Result          json.RawMessage  `json:"result,omitempty"`
 	Error           string           `json:"error,omitempty"`
 	PendingQuestion *PendingQuestion `json:"pending_question,omitempty"`
+	ParentRunID     string           `json:"parent_run_id,omitempty"`
+	TaskID          string           `json:"task_id,omitempty"`
+	// GovernanceEvidence persists the run's axi evidence-chain snapshot across
+	// a human-input pause so the resumed run continues ONE continuous,
+	// tamper-evident chain rather than starting a fresh one. It is opaque to
+	// the domain (an axi SessionSnapshot); only the full-delegation governor
+	// reads and writes it. Empty when no governor exposes an evidence chain.
+	GovernanceEvidence json.RawMessage `json:"governance_evidence,omitempty"`
 }
     Run represents a single execution of the agent. It is the aggregate root for
     the agent domain.
@@ -190,19 +234,41 @@ func (r *Run) AddEvidence(e Evidence)
     AddEvidence appends evidence to the run.
 
 func (r *Run) AskHuman(question string, options []string)
-    AskHuman sets a pending question and pauses the run.
+    AskHuman sets a pending question and pauses the run, stamping AskedAt from
+    the wall clock. The engine uses AskHumanAt with an injected clock.
+
+func (r *Run) AskHumanAt(question string, options []string, t time.Time)
+    AskHumanAt sets a pending question and pauses the run at the given instant.
 
 func (r *Run) ClearPendingQuestion()
     ClearPendingQuestion removes the pending question from the run.
 
 func (r *Run) Complete(result json.RawMessage)
-    Complete marks the run as successfully completed.
+    Complete marks the run as successfully completed, stamping the wall clock.
+    The engine uses CompleteAt with an injected clock for determinism.
+
+func (r *Run) CompleteAt(result json.RawMessage, t time.Time)
+    CompleteAt marks the run as successfully completed at the given instant.
+
+func (r *Run) ConsumedToolCalls() int
+    ConsumedToolCalls reports how many successful tool calls the run has
+    recorded. Each successful act-state tool call appends one tool-result
+    evidence record, so this is the persisted count of tool_calls budget
+    consumed — the source for seeding a resumed run's budget so a human-input
+    pause does not reset it to full.
 
 func (r *Run) Duration() time.Duration
     Duration returns the duration of the run.
 
 func (r *Run) Fail(err string)
-    Fail marks the run as failed with an error.
+    Fail marks the run as failed with an error, stamping the end time from the
+    wall clock. The engine uses FailAt with its injected clock so failure-path
+    timestamps are deterministic; Fail remains for standalone domain use.
+
+func (r *Run) FailAt(err string, t time.Time)
+    FailAt marks the run as failed with an error, stamping the end time from
+    the supplied instant. The engine passes its injected clock's time so the
+    run.failed duration payload is deterministic under a fixed clock.
 
 func (r *Run) GetVar(key string) (any, bool)
     GetVar retrieves a variable from the run context.
@@ -224,10 +290,25 @@ func (r *Run) SetVar(key string, value any)
     SetVar sets a variable in the run context.
 
 func (r *Run) Start()
-    Start marks the run as running.
+    Start marks the run as running, stamping the start time from the wall clock.
+    The engine drives runs via StartAt with an injected clock so replayed and
+    forked runs reproduce identical timestamps; Start remains for standalone
+    domain use.
+
+func (r *Run) StartAt(t time.Time)
+    StartAt marks the run as running, stamping the start time from the supplied
+    instant. The engine passes its injected clock's time so the run start
+    timestamp is deterministic under a fixed clock — no transient wall-clock
+    value is ever stamped before the engine overrides it.
 
 func (r *Run) TransitionTo(state State)
-    TransitionTo changes the current state.
+    TransitionTo changes the current state, stamping terminal end time from the
+    wall clock. The engine drives transitions via the state machine interpreter;
+    TransitionToAt is available for standalone domain use with an injected
+    clock.
+
+func (r *Run) TransitionToAt(state State, t time.Time)
+    TransitionToAt changes the current state, stamping terminal end time from t.
 
 type RunStatus string
     RunStatus represents the current status of a run.
@@ -299,8 +380,9 @@ func (r *StateRegistry) AllStatesIncludingCustom() []State
     AllStatesIncludingCustom returns canonical states plus all custom states.
 
 func (r *StateRegistry) AllowsSideEffects(s State) bool
-    AllowsSideEffects returns true only for the canonical act state.
-    Custom states cannot opt into side effects.
+    AllowsSideEffects returns true only for the canonical act state. Custom
+    states cannot opt into side effects (Register rejects that flag); this
+    method remains fail-closed even if a registry were constructed incorrectly.
 
 func (r *StateRegistry) Get(s State) (CustomState, bool)
     Get returns the custom state definition, or an empty CustomState and false
@@ -316,8 +398,9 @@ func (r *StateRegistry) IsValid(s State) bool
 
 func (r *StateRegistry) Register(cs CustomState) error
     Register adds a custom state to the registry. Returns an error if the state
-    name conflicts with a canonical state, is already registered, or sets
-    AllowsSideEffects (only act may permit side effects).
+    name conflicts with a canonical state or a previously registered custom
+    state, or if AllowsSideEffects is true (only the canonical act state may
+    permit side effects).
 
 type TransitionDecision struct {
 	ToState State  `json:"to_state"`

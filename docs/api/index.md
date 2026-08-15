@@ -1,6 +1,10 @@
 # API Documentation
 
-Generated from source using `go doc`.
+Generated from source using `go doc` (`make docs-api`).
+
+**Source of truth:** package godoc in the Go tree (`interfaces/api`, `domain/*`,
+`application`). Re-run `make docs-api` after public API changes; do not hand-edit
+these snapshots for API accuracy.
 
 ## Packages
 
@@ -18,4 +22,4 @@ Generated from source using `go doc`.
 
 ---
 
-*Generated on 2026-03-28*
+*Generated on 2026-08-15*

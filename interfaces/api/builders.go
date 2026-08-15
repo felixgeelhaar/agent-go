@@ -29,14 +29,20 @@ func NewKnowledgeStore(dimension int) *memory.KnowledgeStore {
 }
 
 // NewMockPlanner creates a mock planner with predefined decisions.
-func NewMockPlanner(decisions ...Decision) *planner.MockPlanner {
+func NewMockPlanner(decisions ...Decision) *MockPlanner {
 	return planner.NewMockPlanner(decisions...)
 }
 
+// MockPlanner is a test planner with a fixed decision sequence.
+type MockPlanner = planner.MockPlanner
+
 // NewScriptedPlanner creates a scripted planner for deterministic testing.
-func NewScriptedPlanner(steps ...planner.ScriptStep) *planner.ScriptedPlanner {
+func NewScriptedPlanner(steps ...planner.ScriptStep) *ScriptedPlanner {
 	return planner.NewScriptedPlanner(steps...)
 }
+
+// ScriptedPlanner replays a predetermined script of decisions.
+type ScriptedPlanner = planner.ScriptedPlanner
 
 // ScriptStep is a step in a scripted planner.
 type ScriptStep = planner.ScriptStep
@@ -48,19 +54,25 @@ type Rule = planner.Rule
 type RuleBuilder = planner.RuleBuilder
 
 // NewRule creates a new rule builder with the given name.
-func NewRule(name string) *planner.RuleBuilder {
+func NewRule(name string) *RuleBuilder {
 	return planner.NewRule(name)
 }
 
+// RuleBasedPlanner evaluates Go-native rules in priority order.
+type RuleBasedPlanner = planner.RuleBasedPlanner
+
 // NewRuleBasedPlanner creates a rule-based planner that evaluates rules in priority order.
 // The fallback decision is returned when no rule matches.
-func NewRuleBasedPlanner(fallback Decision, rules ...planner.Rule) *planner.RuleBasedPlanner {
+func NewRuleBasedPlanner(fallback Decision, rules ...planner.Rule) *RuleBasedPlanner {
 	return planner.NewRuleBasedPlanner(fallback, rules...)
 }
 
+// HybridPlanner tries rules first, then a fallback planner.
+type HybridPlanner = planner.HybridPlanner
+
 // NewHybridPlanner creates a hybrid planner that tries rules first,
 // then falls back to the given planner when no rule matches.
-func NewHybridPlanner(rules *planner.RuleBasedPlanner, fallback domainplanner.Planner) *planner.HybridPlanner {
+func NewHybridPlanner(rules *RuleBasedPlanner, fallback domainplanner.Planner) *HybridPlanner {
 	return planner.NewHybridPlanner(rules, fallback)
 }
 

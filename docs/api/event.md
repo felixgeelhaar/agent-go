@@ -47,6 +47,24 @@ var (
 
 TYPES
 
+type AgentDelegatedPayload struct {
+	ParentRunID string `json:"parent_run_id"`
+	ChildRunID  string `json:"child_run_id"`
+	AgentName   string `json:"agent_name"`
+	Goal        string `json:"goal"`
+}
+    AgentDelegatedPayload contains data for agent.delegated events.
+
+type AgentMessagePayload struct {
+	MessageID     string `json:"message_id"`
+	CorrelationID string `json:"correlation_id"`
+	Sender        string `json:"sender"`
+	Receiver      string `json:"receiver,omitempty"`
+	Action        string `json:"action"`
+	MessageType   string `json:"message_type"`
+}
+    AgentMessagePayload contains data for agent message events.
+
 type ApprovalRequestedPayload struct {
 	ToolName  string          `json:"tool_name"`
 	Input     json.RawMessage `json:"input"`
@@ -107,7 +125,13 @@ type Event struct {
     Event represents a domain event in the event store.
 
 func NewEvent(runID string, eventType Type, payload any) (Event, error)
-    NewEvent creates a new event with the given type and payload.
+    NewEvent creates a new event with the given type and payload, stamped with
+    the current wall-clock time. For deterministic timestamps (replay, fork,
+    tests) use NewEventAt with an injected clock's time.
+
+func NewEventAt(runID string, eventType Type, payload any, ts time.Time) (Event, error)
+    NewEventAt creates a new event stamped with the provided timestamp. The
+    engine passes its injected clock's time so an event stream is reproducible.
 
 func (e *Event) UnmarshalPayload(v any) error
     UnmarshalPayload decodes the event payload into the given value.
@@ -118,6 +142,17 @@ type EvidenceAddedPayload struct {
 	Content json.RawMessage `json:"content"`
 }
     EvidenceAddedPayload contains data for evidence.added events.
+
+type PlannerProposedPayload struct {
+	DecisionType string          `json:"decision_type"`
+	ToolName     string          `json:"tool_name,omitempty"`
+	ToState      agent.State     `json:"to_state,omitempty"`
+	Reason       string          `json:"reason,omitempty"`
+	Input        json.RawMessage `json:"input,omitempty"`
+}
+    PlannerProposedPayload contains data for planner.proposed events. This
+    captures what the planner intended BEFORE execution, allowing comparison
+    with the actual outcome (decision.made).
 
 type Pruner interface {
 	// PruneEvents removes events before a sequence number.
@@ -196,6 +231,16 @@ type Snapshotter interface {
     Snapshotter is an optional interface for stores that support snapshotting.
     Snapshots allow efficient replay by storing aggregate state at checkpoints.
 
+type StateTransitionRejectedPayload struct {
+	FromState agent.State   `json:"from_state"`
+	Attempted agent.State   `json:"attempted"`
+	Reason    string        `json:"reason,omitempty"`
+	Allowed   []agent.State `json:"allowed,omitempty"`
+}
+    StateTransitionRejectedPayload contains data for state.transition.rejected
+    events. Emitted when a Transition/Finish/Fail decision targets a disallowed
+    state; the run stays in FromState and the planner receives Feedback.
+
 type StateTransitionedPayload struct {
 	FromState agent.State `json:"from_state"`
 	ToState   agent.State `json:"to_state"`
@@ -263,7 +308,8 @@ const (
 	TypeRunResumed   Type = "run.resumed"
 
 	// State machine events
-	TypeStateTransitioned Type = "state.transitioned"
+	TypeStateTransitioned       Type = "state.transitioned"
+	TypeStateTransitionRejected Type = "state.transition.rejected"
 
 	// Tool execution events
 	TypeToolCalled    Type = "tool.called"
@@ -287,6 +333,14 @@ const (
 
 	// Variable events
 	TypeVariableSet Type = "variable.set"
+
+	// Planner events
+	TypePlannerProposed Type = "planner.proposed"
+
+	// Agent protocol events
+	TypeAgentMessageSent     Type = "agent.message.sent"
+	TypeAgentMessageReceived Type = "agent.message.received"
+	TypeAgentDelegated       Type = "agent.delegated"
 )
     Event types for the agent runtime.
 

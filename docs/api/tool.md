@@ -33,6 +33,13 @@ var (
 	// ErrToolNotAllowed indicates the tool is not allowed in the current state.
 	ErrToolNotAllowed = errors.New("tool not allowed in current state")
 
+	// ErrSideEffectInNonActState indicates a side-effecting tool was invoked in
+	// a state that does not permit side effects. This is a STRUCTURAL invariant
+	// — it is enforced independently of tool-eligibility configuration and
+	// cannot be relaxed or bypassed. Side effects are permitted only in states
+	// that allow them (canonically, the act state).
+	ErrSideEffectInNonActState = errors.New("side-effecting tool rejected outside a side-effecting state")
+
 	// ErrInvalidInput indicates the input failed schema validation.
 	ErrInvalidInput = errors.New("invalid tool input")
 
@@ -85,7 +92,9 @@ type Annotations struct {
     and planning.
 
 func DefaultAnnotations() Annotations
-    DefaultAnnotations returns annotations with safe defaults.
+    DefaultAnnotations returns conservative annotations: tools are treated as
+    side-effecting (HasSideEffects == true) until explicitly marked ReadOnly.
+    Prefer ReadOnlyAnnotations() for tools that only observe state.
 
 func DestructiveAnnotations() Annotations
     DestructiveAnnotations returns annotations for a destructive tool.
@@ -98,6 +107,19 @@ func (a Annotations) CanCache() bool
 
 func (a Annotations) CanRetry() bool
     CanRetry returns true if the tool can be safely retried on failure.
+
+func (a Annotations) HasSideEffects() bool
+    HasSideEffects reports whether executing the tool may mutate external state.
+
+    This is the STRUCTURAL definition of a side effect used to enforce the
+    non-negotiable invariant "side effects only in the act state". A tool has
+    side effects unless it is explicitly marked ReadOnly. Destructive tools
+    always have side effects, even if mislabelled ReadOnly (defensive).
+
+    Unlike ShouldRequireApproval (a configurable, risk-based policy hint),
+    this method is the ground truth the engine uses to reject side-effecting
+    tools in non-act states. It must remain a pure function of the annotations
+    and must not be widened by configuration.
 
 func (a Annotations) ShouldRequireApproval() bool
     ShouldRequireApproval returns true if the tool should require approval.
@@ -130,7 +152,10 @@ func (b *Builder) Idempotent() *Builder
     Idempotent marks the tool as idempotent.
 
 func (b *Builder) MustBuild() Tool
-    MustBuild constructs the tool definition or panics on error.
+    MustBuild constructs the tool definition or panics on error. This is
+    intentional — use MustBuild only for static tool definitions where a build
+    failure indicates a programming error (e.g., missing name). For dynamic tool
+    creation where errors are expected, use Build instead.
 
 func (b *Builder) ReadOnly() *Builder
     ReadOnly marks the tool as read-only.
@@ -289,8 +314,11 @@ func (s *Schema) UnmarshalJSON(data []byte) error
     UnmarshalJSON implements json.Unmarshaler.
 
 func (s Schema) Validate(data json.RawMessage) error
-    Validate validates data against the schema. For now, this is a placeholder -
-    full JSON Schema validation will be implemented in internal/schema.
+    Validate validates data against a practical JSON Schema subset:
+    top-level type, required object properties, and per-property type checks.
+    Nested schemas beyond one property level and keywords like pattern/minimum
+    are not enforced here; use a full Draft 2020-12 validator in infrastructure
+    when needed.
 
 type Tool interface {
 	// Name returns the stable string identifier for the tool.

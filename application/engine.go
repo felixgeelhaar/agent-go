@@ -1032,14 +1032,7 @@ func (e *Engine) executeTransition(ctx context.Context, interp *statemachine.Int
 		// planner self-corrects on the next step (and loop detection bounds
 		// repeated rejections). Other errors fail the run.
 		if errors.Is(err, agent.ErrTransitionRejected) {
-			allowed := e.transitions.AllowedTransitions(machineCtx.Run.CurrentState)
-			machineCtx.Feedback = fmt.Sprintf(
-				"Your transition to %q was rejected. You are still in state %q. Valid transitions from here are: %v. Choose one of those, or call an allowed tool.",
-				decision.ToState, machineCtx.Run.CurrentState, allowed)
-			e.logger.Info().
-				Add(logging.RunID(machineCtx.Run.ID)).
-				Add(logging.State(machineCtx.Run.CurrentState)).
-				Msg("transition rejected; feeding back to planner")
+			e.softRejectTransition(ctx, machineCtx, decision.ToState, decision.Reason)
 			return nil
 		}
 		return err
@@ -1048,6 +1041,25 @@ func (e *Engine) executeTransition(ctx context.Context, interp *statemachine.Int
 		FromState: fromState, ToState: decision.ToState, Reason: decision.Reason,
 	}, machineCtx)
 	return nil
+}
+
+// softRejectTransition records planner feedback and an audit event when a
+// Transition/Finish/Fail targets a state that policy or the machine rejects.
+func (e *Engine) softRejectTransition(ctx context.Context, machineCtx *statemachine.Context, attempted agent.State, reason string) {
+	allowed := e.transitions.AllowedTransitions(machineCtx.Run.CurrentState)
+	machineCtx.Feedback = fmt.Sprintf(
+		"Your transition to %q was rejected. You are still in state %q. Valid transitions from here are: %v. Choose one of those, or call an allowed tool.",
+		attempted, machineCtx.Run.CurrentState, allowed)
+	e.logger.Info().
+		Add(logging.RunID(machineCtx.Run.ID)).
+		Add(logging.State(machineCtx.Run.CurrentState)).
+		Msg("transition rejected; feeding back to planner")
+	e.publishEvent(ctx, machineCtx.Run.ID, event.TypeStateTransitionRejected, event.StateTransitionRejectedPayload{
+		FromState: machineCtx.Run.CurrentState,
+		Attempted: attempted,
+		Reason:    reason,
+		Allowed:   allowed,
+	}, machineCtx)
 }
 
 // executeAskHuman handles human input requests by pausing the run.
@@ -1072,10 +1084,16 @@ func (e *Engine) executeAskHuman(_ context.Context, _ *statemachine.Interpreter,
 }
 
 // executeFinish completes the run successfully.
-func (e *Engine) executeFinish(_ context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FinishDecision) error {
+func (e *Engine) executeFinish(ctx context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FinishDecision) error {
 	run := machineCtx.Run
 	// Transition first, then mark complete (order matters - transition checks current state)
 	if err := interp.Transition(agent.StateDone, decision.Summary); err != nil {
+		// Finish from a state that cannot reach done (e.g. explore) is soft-rejected
+		// so the planner can transition to decide/validate first.
+		if errors.Is(err, agent.ErrTransitionRejected) {
+			e.softRejectTransition(ctx, machineCtx, agent.StateDone, decision.Summary)
+			return nil
+		}
 		return err
 	}
 	run.Result = decision.Result
@@ -1087,10 +1105,14 @@ func (e *Engine) executeFinish(_ context.Context, interp *statemachine.Interpret
 }
 
 // executeFail terminates the run with failure.
-func (e *Engine) executeFail(_ context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FailDecision) error {
+func (e *Engine) executeFail(ctx context.Context, interp *statemachine.Interpreter, machineCtx *statemachine.Context, decision *agent.FailDecision) error {
 	run := machineCtx.Run
 	// Transition first, then mark failed (order matters - transition checks current state)
 	if err := interp.Transition(agent.StateFailed, decision.Reason); err != nil {
+		if errors.Is(err, agent.ErrTransitionRejected) {
+			e.softRejectTransition(ctx, machineCtx, agent.StateFailed, decision.Reason)
+			return nil
+		}
 		return err
 	}
 	run.Error = decision.Reason

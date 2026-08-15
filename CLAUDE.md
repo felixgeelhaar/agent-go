@@ -237,10 +237,10 @@ Configured via `resilience.Executor`:
 
 ### Event Streaming
 
-The engine publishes 21 event types to an optional EventStore:
+The engine publishes 22 event types to an optional EventStore:
 
 - **Run lifecycle**: `run.started`, `run.completed`, `run.failed`, `run.paused`, `run.resumed`
-- **State machine**: `state.transitioned`
+- **State machine**: `state.transitioned`, `state.transition.rejected`
 - **Tool execution**: `tool.called`, `tool.succeeded`, `tool.failed`
 - **Decisions**: `planner.proposed`, `decision.made`
 - **Policy**: `approval.requested`, `approval.granted`, `approval.denied`

@@ -593,6 +593,53 @@ func TestRun_TransitionRejection_FeedbackAndSelfCorrect(t *testing.T) {
 	}
 }
 
+func TestRun_FinishFromExplore_SoftRejectedThenSelfCorrect(t *testing.T) {
+	// Finish is only valid from decide/validate under DefaultTransitions.
+	// Soft-reject + feedback lets the planner recover instead of failing the run.
+	p := &finishThenSelfCorrectPlanner{}
+	engine, err := NewEngine(EngineConfig{Registry: newTestRegistry(), Planner: p})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	run, runErr := engine.Run(context.Background(), "finish-self-correct")
+	if runErr != nil {
+		t.Fatalf("expected recovery, got error: %v", runErr)
+	}
+	if run.Status != agent.RunStatusCompleted {
+		t.Errorf("expected completed, got %s", run.Status)
+	}
+	if !p.sawFeedback {
+		t.Error("planner did not receive feedback after rejected Finish")
+	}
+}
+
+type finishThenSelfCorrectPlanner struct {
+	step        int
+	sawFeedback bool
+}
+
+func (p *finishThenSelfCorrectPlanner) Plan(_ context.Context, req planner.PlanRequest) (agent.Decision, error) {
+	if req.Feedback != "" {
+		p.sawFeedback = true
+	}
+	p.step++
+	switch req.CurrentState {
+	case agent.StateIntake:
+		return agent.NewTransitionDecision(agent.StateExplore, "start"), nil
+	case agent.StateExplore:
+		if !p.sawFeedback {
+			// Illegal Finish — should soft-reject
+			return agent.NewFinishDecision("too early", nil), nil
+		}
+		return agent.NewTransitionDecision(agent.StateDecide, "go decide"), nil
+	case agent.StateDecide:
+		return agent.NewFinishDecision("done", nil), nil
+	default:
+		return agent.NewFailDecision("unexpected", nil), nil
+	}
+}
+
 func TestRun_InvalidTransition_Rejected(t *testing.T) {
 	// A persistently-invalid transition (intake->act has no machine edge) is
 	// rejected — never applied — and the run is bounded by loop detection,

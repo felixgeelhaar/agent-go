@@ -43,7 +43,7 @@ agent-go is more than a single-agent engine — it's a **policy-aware, event-dri
 |-----------|-------------|
 | **Multi-agent coordination** | DelegateTool wraps child engines as tools. TaskContext shares state across agent hierarchies. |
 | **Agent protocol** | Message envelope with correlation IDs, capability discovery, trust boundaries, request-reply and broadcast patterns. |
-| **Event streaming** | `Stream()` returns a real-time channel of 21 event types. Powers dashboards, debugging, and orchestration. |
+| **Event streaming** | `Stream()` returns a real-time channel of 22 event types. Powers dashboards, debugging, and orchestration. |
 | **MCP integration** | Expose tools via Model Context Protocol with full policy enforcement (approval, budgets, audit trail). |
 | **Replay and fork** | Replay historical runs from events. Fork runs at any step for simulation and testing. |
 | **Shared memory** | Cross-agent TaskContext with thread-safe shared variables, evidence, and artifact references. |
