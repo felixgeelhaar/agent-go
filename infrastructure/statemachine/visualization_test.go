@@ -175,9 +175,8 @@ func TestExportMermaid_CustomStates(t *testing.T) {
 
 	def, err := NewAgentMachineBuilder().
 		WithCustomState(agent.CustomState{
-			Name:              agent.State("execute"),
-			AllowsSideEffects: true,
-			Terminal:          false,
+			Name:     agent.State("execute"),
+			Terminal: false,
 		}).
 		WithCustomState(agent.CustomState{
 			Name:     agent.State("aborted"),
@@ -210,9 +209,12 @@ func TestExportMermaid_CustomStates(t *testing.T) {
 		t.Error("Mermaid should have aborted -> [*] for custom terminal state")
 	}
 
-	// Side effects note for custom state
-	if !strings.Contains(mermaid, "note right of execute : Side effects allowed") {
-		t.Error("Mermaid should note side effects for custom 'execute' state")
+	// Custom states must not claim side effects; only act may.
+	if strings.Contains(mermaid, "note right of execute : Side effects allowed") {
+		t.Error("Mermaid must not note side effects for custom 'execute' state")
+	}
+	if !strings.Contains(mermaid, "note right of act : Side effects allowed") {
+		t.Error("Mermaid should note side effects for canonical act")
 	}
 }
 
@@ -221,8 +223,7 @@ func TestExportDOT_SideEffectHighlight(t *testing.T) {
 
 	def, err := NewAgentMachineBuilder().
 		WithCustomState(agent.CustomState{
-			Name:              agent.State("deploy"),
-			AllowsSideEffects: true,
+			Name: agent.State("deploy"),
 		}).
 		WithCustomTransition(agent.StateAct, agent.State("deploy")).
 		Build()
@@ -233,12 +234,29 @@ func TestExportDOT_SideEffectHighlight(t *testing.T) {
 
 	dot := def.ExportDOT()
 
-	// Both act and deploy should be highlighted
 	if !strings.Contains(dot, "act [") {
 		t.Error("act state should be in DOT output with attributes")
 	}
-	if !strings.Contains(dot, "deploy [") {
-		t.Error("deploy state should be in DOT output with side-effect styling")
+	if !strings.Contains(dot, "deploy") {
+		t.Error("deploy custom state should appear in DOT output")
+	}
+	// Only act gets side-effect styling; custom states cannot opt in.
+	if strings.Count(dot, "fillcolor=") < 1 {
+		t.Error("expected side-effect styling on act")
+	}
+}
+
+func TestMachineBuilder_RejectsCustomSideEffects(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewAgentMachineBuilder().
+		WithCustomState(agent.CustomState{
+			Name:              agent.State("execute"),
+			AllowsSideEffects: true,
+		}).
+		Build()
+	if err == nil {
+		t.Fatal("Build() should reject custom side-effect states")
 	}
 }
 

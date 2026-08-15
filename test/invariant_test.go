@@ -637,6 +637,20 @@ func TestInvariant_StateSemantics(t *testing.T) {
 		if agent.StateDecide.AllowsSideEffects() {
 			t.Error("decide state should not allow side effects")
 		}
+
+		reg := agent.NewStateRegistry()
+		if err := reg.Register(agent.CustomState{
+			Name:              agent.State("execute"),
+			AllowsSideEffects: true,
+		}); err != agent.ErrCustomSideEffectsForbidden {
+			t.Fatalf("custom side-effect state error = %v, want %v", err, agent.ErrCustomSideEffectsForbidden)
+		}
+		if err := reg.Register(agent.CustomState{Name: agent.State("review")}); err != nil {
+			t.Fatalf("register review: %v", err)
+		}
+		if reg.AllowsSideEffects(agent.State("review")) {
+			t.Error("custom states must not allow side effects")
+		}
 	})
 
 	// Non-negotiable: the structural act-gate cannot be bypassed by

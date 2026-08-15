@@ -54,4 +54,9 @@ var (
 
 	// ErrCustomStateDuplicate indicates a custom state with the same name is already registered.
 	ErrCustomStateDuplicate = errors.New("custom state already registered")
+
+	// ErrCustomSideEffectsForbidden indicates a custom state attempted to opt into
+	// side effects. Only the canonical act state may allow side-effecting tools
+	// (design invariant: state semantics).
+	ErrCustomSideEffectsForbidden = errors.New("custom states cannot allow side effects; only act may")
 )

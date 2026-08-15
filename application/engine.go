@@ -1004,10 +1004,9 @@ func (e *Engine) executeToolDecision(ctx context.Context, _ *statemachine.Interp
 }
 
 // stateAllowsSideEffects reports whether the given state permits side-effecting
-// tools. It consults the run's StateRegistry so custom states that declare
-// AllowsSideEffects are honored, and otherwise falls back to the canonical
-// rule (only the act state permits side effects). This backs the structural
-// act-gate and is never configurable away.
+// tools. Only the canonical act state may; custom states cannot opt in
+// (StateRegistry.Register rejects AllowsSideEffects). This backs invariant 5
+// and is never configurable away.
 func (e *Engine) stateAllowsSideEffects(machineCtx *statemachine.Context, state agent.State) bool {
 	if machineCtx != nil && machineCtx.StateRegistry != nil {
 		return machineCtx.StateRegistry.AllowsSideEffects(state)
