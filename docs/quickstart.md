@@ -4,7 +4,7 @@ Get your first agent running in 5 minutes.
 
 ## Prerequisites
 
-- Go 1.21 or later
+- **Go 1.26.2 or later** (module floor; see `CONTRIBUTING.md`)
 - A code editor
 
 ## Step 1: Create a New Project
@@ -13,7 +13,7 @@ Get your first agent running in 5 minutes.
 mkdir my-first-agent
 cd my-first-agent
 go mod init my-first-agent
-go get go.klarlabs.de/agent
+go get go.klarlabs.de/agent/interfaces/api@latest
 ```
 
 ## Step 2: Create Your Agent
@@ -56,7 +56,8 @@ func main() {
         }).
         MustBuild()
 
-    // Create a scripted planner that defines the agent's behavior
+    // Create a scripted planner that defines the agent's behavior.
+    // Finish is only allowed from decide (or validate) under DefaultTransitions.
     planner := agent.NewScriptedPlanner(
         // Step 1: Move from intake to explore
         agent.ScriptStep{
@@ -68,14 +69,21 @@ func main() {
             ExpectState: agent.StateExplore,
             Decision:    agent.NewCallToolDecision("add", json.RawMessage(`{"a": 5, "b": 3}`), "adding numbers"),
         },
-        // Step 3: Finish with the result
+        // Step 3: Move to decide
         agent.ScriptStep{
             ExpectState: agent.StateExplore,
+            Decision:    agent.NewTransitionDecision(agent.StateDecide, "ready to finish"),
+        },
+        // Step 4: Finish with the result
+        agent.ScriptStep{
+            ExpectState: agent.StateDecide,
             Decision:    agent.NewFinishDecision("calculation complete", json.RawMessage(`{"answer": 8}`)),
         },
     )
 
-    // Build the engine
+    // Build the engine.
+    // Default eligibility allows registered tools in explore/decide/act/validate.
+    // For production, prefer an explicit allow-list via WithToolEligibility.
     engine, err := agent.New(
         agent.WithTool(addTool),
         agent.WithPlanner(planner),
@@ -94,30 +102,30 @@ func main() {
     fmt.Println("=== Agent Run Complete ===")
     fmt.Printf("Status: %s\n", run.Status)
     fmt.Printf("Result: %s\n", run.Result)
-    fmt.Printf("Steps taken: %d\n", run.StepCount)
+    fmt.Printf("Final state: %s\n", run.CurrentState)
 }
 ```
 
 ## Step 3: Run Your Agent
 
 ```bash
-go run main.go
+go run .
 ```
 
 Expected output:
 ```
 === Agent Run Complete ===
-Status: done
+Status: completed
 Result: {"answer": 8}
-Steps taken: 3
+Final state: done
 ```
 
 ## What Just Happened?
 
 1. **Tool Creation**: We created an `add` tool with annotations indicating it's read-only and idempotent
 2. **Planner Setup**: We used a `ScriptedPlanner` which follows a predetermined script (perfect for testing)
-3. **Engine Configuration**: We built the engine with our tool and planner
-4. **Execution**: The engine ran through the scripted steps: intake → explore → done
+3. **Engine Configuration**: We built the engine with our tool and planner (default eligibility is enough to start)
+4. **Execution**: The engine ran through the scripted steps: intake → explore → decide → done
 
 ## Understanding the State Machine
 
@@ -131,12 +139,28 @@ intake (start)
 explore (gathering info)
    ↓
    └─→ called "add" tool with {a: 5, b: 3}
-   └─→ "calculation complete"
+   └─→ "ready to finish"
 
-done (terminal)
+decide
+   ↓
+   └─→ Finish → done (terminal)
 ```
 
 ## Next Steps
+
+### Tighten Tool Eligibility (recommended for production)
+
+```go
+eligibility := agent.NewToolEligibilityWith(agent.EligibilityRules{
+    agent.StateExplore: {"add"},
+})
+
+engine, _ := agent.New(
+    agent.WithTool(addTool),
+    agent.WithPlanner(planner),
+    agent.WithToolEligibility(eligibility),
+)
+```
 
 ### Add More Tools
 
@@ -167,36 +191,14 @@ engine, _ := agent.New(
 
 ### Use a Real LLM Planner
 
-```go
-import "go.klarlabs.de/agent/infrastructure/planner/provider/anthropic"
+See [`example/04-llm-planner`](../example/04-llm-planner/) and the
+[`contrib/planner-llm`](../contrib/planner-llm/) module for provider wiring.
 
-provider, _ := anthropic.New(
-    anthropic.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-    anthropic.WithModel("claude-sonnet-4-20250514"),
-)
+### Explore Examples
 
-llmPlanner := planner.NewLLMPlanner(planner.LLMPlannerConfig{
-    Provider: provider,
-})
-
-engine, _ := agent.New(
-    agent.WithTool(addTool),
-    agent.WithPlanner(llmPlanner),
-)
-```
-
-### Add Observability
-
-```go
-import "go.klarlabs.de/agent/infrastructure/observability"
-
-tracer, _ := observability.NewTracer("calculator-agent")
-
-engine, _ := agent.New(
-    agent.WithTool(addTool),
-    agent.WithPlanner(planner),
-    agent.WithMiddleware(observability.TracingMiddleware(tracer)),
-)
+```bash
+go run ./example/01-minimal
+go run ./example/flagship
 ```
 
 ## Learn More

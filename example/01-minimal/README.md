@@ -19,7 +19,7 @@ go run main.go
 
 ```
 === Minimal Agent Example ===
-Status: done
+Status: completed
 Result: {"status":"complete"}
 ```
 
@@ -47,16 +47,28 @@ planner := agent.NewScriptedPlanner(
 )
 ```
 
-### 3. Build Engine
+### 3. Allow the tool in explore (explicit allow-list)
+
+```go
+eligibility := agent.NewToolEligibility()
+eligibility.Allow(agent.StateExplore, "echo")
+```
+
+Omitting eligibility also works: the engine defaults to
+`NewDefaultToolEligibility()` (wildcard allow in explore/decide/act/validate).
+This example uses an explicit allow-list to show the production pattern.
+
+### 4. Build Engine
 
 ```go
 engine, err := agent.New(
     agent.WithTool(echoTool),
     agent.WithPlanner(planner),
+    agent.WithToolEligibility(eligibility),
 )
 ```
 
-### 4. Run
+### 5. Run
 
 ```go
 run, err := engine.Run(context.Background(), "Echo a message")

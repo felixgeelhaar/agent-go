@@ -25,18 +25,13 @@
 //	    api.ScriptStep{ExpectState: api.StateDecide, Decision: api.NewFinishDecision("completed", result)},
 //	)
 //
-//	// 3. Configure tool eligibility
-//	// Option A: Declarative style (recommended for static configuration)
+//	// 3. Configure tool eligibility (optional)
+//	// When omitted, the engine uses NewDefaultToolEligibility(): wildcard allow
+//	// in explore/decide/act/validate. Prefer an explicit allow-list in production.
 //	eligibility := api.NewToolEligibilityWith(api.EligibilityRules{
 //	    api.StateExplore: {"echo", "read_file"},
 //	    api.StateAct:     {"write_file"},
 //	})
-//
-//	// Option B: Imperative style (useful for dynamic configuration)
-//	eligibility := api.NewToolEligibility()
-//	eligibility.Allow(api.StateExplore, "echo")
-//	eligibility.Allow(api.StateExplore, "read_file")
-//	eligibility.Allow(api.StateAct, "write_file")
 //
 //	// 4. Create and run the engine
 //	engine, _ := api.New(

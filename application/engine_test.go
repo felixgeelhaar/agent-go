@@ -101,6 +101,13 @@ func TestNewEngine_SetsDefaults(t *testing.T) {
 	if engine.eligibility == nil {
 		t.Error("expected default eligibility to be set")
 	}
+	// Onboarding default: wildcard allow in explore (and decide/act/validate).
+	if !engine.eligibility.IsAllowed(agent.StateExplore, "any_tool") {
+		t.Error("expected default eligibility to allow tools in explore via wildcard")
+	}
+	if engine.eligibility.IsAllowed(agent.StateIntake, "any_tool") {
+		t.Error("expected default eligibility to deny tools in intake")
+	}
 	if engine.transitions == nil {
 		t.Error("expected default transitions to be set")
 	}
