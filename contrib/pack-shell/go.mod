@@ -2,6 +2,4 @@ module go.klarlabs.de/agent/contrib/pack-shell
 
 go 1.26.2
 
-require go.klarlabs.de/agent v0.15.0
-
-replace go.klarlabs.de/agent => ../..
+require go.klarlabs.de/agent v0.15.1-0.20260815153923-14af654b79bf
