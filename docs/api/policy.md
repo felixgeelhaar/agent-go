@@ -35,7 +35,9 @@ var (
 	// ErrConstraintViolation indicates a policy constraint was violated.
 	ErrConstraintViolation = errors.New("constraint violation")
 
-	// ErrTransitionNotAllowed indicates the state transition is not permitted.
+	// ErrTransitionNotAllowed is deprecated: the engine uses
+	// agent.ErrTransitionRejected for soft-rejected transitions.
+	// Kept so older call sites compiling against policy still link.
 	ErrTransitionNotAllowed = errors.New("state transition not allowed")
 
 	// ErrToolNotEligible indicates the tool is not eligible in the current state.

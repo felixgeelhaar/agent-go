@@ -89,37 +89,33 @@ States transition based on planner decisions or engine logic:
 // Planner can request a transition
 decision := agent.NewTransitionDecision(agent.StateExplore, "need more info")
 
-// Engine validates the transition is legal
-// Invalid transitions cause errors, not undefined behavior
+// Invalid Transition/Finish/Fail targets are soft-rejected: state is unchanged,
+// PlanRequest.Feedback explains the allowed targets, and a
+// state.transition.rejected event is published. Loop detection bounds retries.
 ```
 
-### Valid Transitions
+### Valid Transitions (`DefaultTransitions`)
 
-| From | To | Condition |
-|------|----|-----------|
-| `intake` | `explore` | Always valid |
-| `intake` | `failed` | On error |
-| `explore` | `decide` | When ready to act |
-| `explore` | `done` | Enough info to finish |
-| `explore` | `failed` | On error |
-| `decide` | `act` | Ready to execute |
-| `decide` | `done` | No action needed |
-| `decide` | `explore` | Need more info |
-| `decide` | `failed` | Cannot proceed |
-| `act` | `validate` | After execution |
-| `act` | `failed` | On error |
-| `validate` | `done` | Success verified |
-| `validate` | `explore` | Need more info |
-| `validate` | `failed` | Validation failed |
+| From | To |
+|------|----|
+| `intake` | `explore`, `failed` |
+| `explore` | `decide`, `failed` |
+| `decide` | `act`, `done`, `failed` |
+| `act` | `validate`, `failed` |
+| `validate` | `done`, `explore`, `failed` |
+
+`Finish` requires a path to `done` (from `decide` or `validate`). `Fail` requires a path to `failed`.
 
 ### Custom Transitions
 
-You can configure custom transition rules:
-
 ```go
-transitions := agent.NewTransitionGraph()
-transitions.Allow(agent.StateExplore, agent.StateAct)  // Skip decide
-transitions.Deny(agent.StateAct, agent.StateExplore)   // No going back
+transitions := agent.NewStateTransitionsWith(agent.TransitionRules{
+    agent.StateIntake:   {agent.StateExplore, agent.StateFailed},
+    agent.StateExplore:  {agent.StateDecide, agent.StateAct, agent.StateFailed}, // skip decide
+    agent.StateDecide:   {agent.StateAct, agent.StateDone, agent.StateFailed},
+    agent.StateAct:      {agent.StateValidate, agent.StateFailed},
+    agent.StateValidate: {agent.StateDone, agent.StateFailed},
+})
 
 engine, _ := agent.New(
     agent.WithTransitions(transitions),
@@ -134,32 +130,14 @@ The most common use of states is controlling tool access:
 eligibility := agent.NewToolEligibility()
 
 // Read-only tools: explore and validate
-eligibility.Allow(agent.StateExplore, "read_file", "list_dir", "search")
-eligibility.Allow(agent.StateValidate, "read_file", "check_result")
+eligibility.AllowMultiple(agent.StateExplore, "read_file", "list_dir", "search")
+eligibility.AllowMultiple(agent.StateValidate, "read_file", "check_result")
 
 // Destructive tools: act only
-eligibility.Allow(agent.StateAct, "write_file", "delete_file", "execute")
+eligibility.AllowMultiple(agent.StateAct, "write_file", "delete_file", "execute")
 
 engine, _ := agent.New(
     agent.WithToolEligibility(eligibility),
-)
-```
-
-## State Guards
-
-Guards add conditions to state transitions:
-
-```go
-// Only allow transition to 'act' if we have enough evidence
-guard := func(ctx context.Context, run *agent.Run, to agent.State) bool {
-    if to == agent.StateAct {
-        return len(run.Evidence) >= 2  // Need at least 2 pieces of evidence
-    }
-    return true
-}
-
-engine, _ := agent.New(
-    agent.WithTransitionGuard(guard),
 )
 ```
 

@@ -27,6 +27,13 @@ Package application provides application services.
 
 Package application provides application services.
 
+VARIABLES
+
+var ErrInvalidStep = errors.New("invalid step index")
+    ErrInvalidStep indicates a fork/reconstruct was requested at a step index
+    below 1 (steps are 1-based).
+
+
 TYPES
 
 type DetectionService struct {
@@ -63,6 +70,40 @@ func NewEngine(config EngineConfig) (*Engine, error)
 func NewEngineWithOptions(opts ...Option) (*Engine, error)
     NewEngineWithOptions creates an engine with functional options.
 
+func (e *Engine) ContinueRun(ctx context.Context, run *agent.Run) (*agent.Run, error)
+    ContinueRun drives a reconstructed run (e.g. the product of Fork or a
+    replay) further from its current state. It re-attaches a fresh state
+    machine and a new per-run Governor to the run and resumes the step loop from
+    run.CurrentState, re-applying the full pipeline: the structural act-gate,
+    governance authorization (budget + approval), and the 12-event stream.
+
+    The run's tool-call budget is seeded with the calls already consumed (the
+    persisted tool-result evidence count) so a continued fork does not silently
+    reset its run-spanning budget to full. A nil or already-terminal run is
+    returned unchanged with an error.
+
+    ContinueRun is the run-advancing counterpart to Fork: Fork reconstructs and
+    inspects, ContinueRun re-drives. Pair them to branch a run and explore the
+    branch under the same governance and act-gate guarantees as the original.
+
+func (e *Engine) Fork(ctx context.Context, runID string, stepN int) (*agent.Run, error)
+    Fork creates a new run branched from an existing run's event history at a
+    given step. The source run is reconstructed up to and including its first
+    stepN executed steps (decision.made boundaries), and the resulting state —
+    goal, variables, evidence, and current state — is materialized into a fresh
+    run with a new ID. The fork is persisted (when a run store is configured)
+    and a lineage event linking parent and child is recorded in the new run's
+    event stream.
+
+    Fork enables "what-if" branching and deterministic re-exploration from any
+    point in a run's history (pair with WithClock for fully reproducible forks).
+    The returned run is in its reconstructed state and not yet re-executed;
+    callers may inspect it, or drive it further with ContinueRun, which resumes
+    the step loop from the fork's current state under the same governance and
+    structural act-gate guarantees.
+
+    Requires an event store (use WithEventStore). stepN must be >= 1.
+
 func (e *Engine) Knowledge() knowledge.Store
     Knowledge returns the knowledge store, if configured.
 
@@ -71,6 +112,11 @@ func (e *Engine) ResumeWithInput(ctx context.Context, run *agent.Run, input stri
 
 func (e *Engine) Run(ctx context.Context, goal string) (*agent.Run, error)
     Run executes the agent with the given goal.
+
+func (e *Engine) RunInTask(ctx context.Context, goal string, tc *task.Context) (*agent.Run, error)
+    RunInTask executes the agent within a shared task context. The task context
+    enables sharing variables, evidence, and artifact references between parent
+    and child agents in a delegation hierarchy.
 
 func (e *Engine) RunWithVars(ctx context.Context, goal string, vars map[string]any) (*agent.Run, error)
     RunWithVars executes the agent with the given goal and initial variables.
@@ -83,7 +129,7 @@ func (e *Engine) Stream(ctx context.Context, goal string) (string, <-chan event.
 
 type EngineConfig struct {
 	Registry     tool.Registry
-	Planner      planner.Planner
+	Planner      domainplanner.Planner
 	Executor     *resilience.Executor
 	Artifacts    artifact.Store
 	Knowledge    knowledge.Store
@@ -92,11 +138,40 @@ type EngineConfig struct {
 	Approver     policy.Approver
 	BudgetLimits map[string]int
 	MaxSteps     int
-	Middleware   *middleware.Registry
-	Tracer       telemetry.Tracer
-	Meter        telemetry.Meter
-	RunStore     run.Store
-	EventStore   event.Store
+	// MaxNoProgress aborts a run after this many consecutive steps that make no
+	// progress — no state change AND no new evidence (e.g. the planner keeps
+	// emitting self-transitions or repeats). This is loop detection: it catches a
+	// stuck agent cheaply, long before MaxSteps. Zero uses the default (6).
+	MaxNoProgress int
+	Middleware    *middleware.Registry
+	Tracer        telemetry.Tracer
+	Meter         telemetry.Meter
+	RunStore      run.Store
+	EventStore    event.Store
+	TaskContext   *task.Context
+	// Governance selects the governance backend (budget + approval +
+	// evidence). When nil, the full-delegation KernelFactory is used: each run
+	// is ONE axi session, so budget, the destructive-tool approval gate, and
+	// the evidence chain are all axi-native.
+	Governance governance.Factory
+	// Logger is the injected structured logger. When nil, a no-op logger is
+	// used and the engine emits no logs — the execution path never falls back
+	// to the package-level logging singleton.
+	Logger *logging.Logger
+	// Clock supplies the time used for run IDs, run start timestamps, and
+	// event timestamps. When nil, the system clock is used. Inject a fixed or
+	// statekit FakeClock for deterministic replay and tests.
+	Clock clock.Clock
+	// StrictAudit, when non-nil, overrides the default audit policy. When nil,
+	// strict audit is enabled whenever EventStore is configured. Strict mode
+	// fails the run if EventStore.Append or RunStore Save/Update returns an
+	// error, instead of logging and continuing.
+	//
+	// Audit clarity: the per-run ledger created by the engine is ephemeral
+	// (in-memory for that run only). Durable, queryable audit requires an
+	// EventStore (and optionally a RunStore). Prefer WithEventStore in
+	// production; without it there is no durable audit trail.
+	StrictAudit *bool
 }
     EngineConfig contains configuration for the engine.
 
@@ -213,6 +288,11 @@ func WithArtifactStore(s artifact.Store) Option
 func WithBudgets(limits map[string]int) Option
     WithBudgets sets budget limits.
 
+func WithClock(c clock.Clock) Option
+    WithClock sets the clock used for run IDs, run start timestamps, and event
+    timestamps. When unset, the system clock is used. Inject a fixed or statekit
+    FakeClock for deterministic replay and tests.
+
 func WithEligibility(e *policy.ToolEligibility) Option
     WithEligibility sets the tool eligibility configuration.
 
@@ -223,6 +303,11 @@ func WithEventStore(s event.Store) Option
 
 func WithExecutor(e *resilience.Executor) Option
     WithExecutor sets the resilient executor.
+
+func WithLogger(l *logging.Logger) Option
+    WithLogger sets the injected structured logger for the engine. When unset,
+    the engine uses a no-op logger and emits nothing — the execution path never
+    depends on the package-level logging singleton.
 
 func WithMaxSteps(n int) Option
     WithMaxSteps sets the maximum number of steps.
@@ -237,7 +322,7 @@ func WithMiddleware(m *middleware.Registry) Option
     control per state) - Approval middleware (human approval for destructive
     tools) - Logging middleware (execution timing and results)
 
-func WithPlanner(p planner.Planner) Option
+func WithPlanner(p domainplanner.Planner) Option
     WithPlanner sets the planner.
 
 func WithRegistry(r tool.Registry) Option
@@ -248,6 +333,11 @@ func WithRunStore(s run.Store) Option
     runs are automatically saved on creation and updated on each step and
     terminal state. Persistence is best-effort — failures are logged but do not
     abort the run.
+
+func WithTaskContext(tc *task.Context) Option
+    WithTaskContext sets a shared task context for multi-agent coordination.
+    When configured, the engine merges shared variables, propagates evidence to
+    the task context, and sets ParentRunID/TaskID on runs.
 
 func WithTracer(t telemetry.Tracer) Option
     WithTracer sets the OpenTelemetry tracer for distributed tracing. When
@@ -273,6 +363,16 @@ func (r *Replay) NewTimeline(ctx context.Context, runID string) (*Timeline, erro
 
 func (r *Replay) ReconstructRun(ctx context.Context, runID string) (*agent.Run, error)
     ReconstructRun rebuilds a run's state from its event history.
+
+func (r *Replay) ReconstructRunAtStep(ctx context.Context, runID string, n int) (*agent.Run, error)
+    ReconstructRunAtStep rebuilds a run's state from its event history up to and
+    including the first n executed steps. A step boundary is a decision.made
+    event, so the reconstructed run reflects the effects of the first n planner
+    decisions (transitions, tool results, variables, evidence) and stops before
+    the (n+1)th decision.
+
+    n must be >= 1. If the run has fewer than n steps, the full history is
+    applied. This is the truncation primitive used by Engine.Fork.
 
 func (r *Replay) ReconstructRunFrom(ctx context.Context, runID string, fromSeq uint64) (*agent.Run, error)
     ReconstructRunFrom rebuilds a run's state from a starting sequence.

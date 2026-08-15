@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `state.transition.rejected` event when Transition/Finish/Fail targets a
+  disallowed state (soft-reject path).
+- Public API constructors: `NewEventStore`, `NewRunStore`, `NewArtifactStore`,
+  `NewDelegateTool`, `NewExecutorWithOptions` (+ executor option helpers).
+
+### Fixed
+- Soft-reject Finish/Fail when `done`/`failed` is not reachable from the current
+  state (planner receives Feedback; run continues under loop detection).
+- Concept `states.md` transition table matches `DefaultTransitions`.
+- Regenerated `docs/api/*` from godoc; Actions pins bumped to Node 24 majors.
+
 ## [0.16.0] - 2026-08-15
 
 ### Added

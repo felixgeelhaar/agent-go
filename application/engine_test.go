@@ -572,16 +572,16 @@ func (p *selfCorrectPlanner) Plan(_ context.Context, req planner.PlanRequest) (a
 	}
 }
 
-func TestRun_TransitionRejection_FeedbackAndSelfCorrect(t *testing.T) {
-	// A rejected transition is recoverable: the engine feeds it back, the planner
-	// sees it and chooses a valid transition, and the run completes.
-	p := &selfCorrectPlanner{}
+func TestRun_FinishFromExplore_SoftRejectedThenSelfCorrect(t *testing.T) {
+	// Finish is only valid from decide/validate under DefaultTransitions.
+	// Soft-reject + feedback lets the planner recover instead of failing the run.
+	p := &finishThenSelfCorrectPlanner{}
 	engine, err := NewEngine(EngineConfig{Registry: newTestRegistry(), Planner: p})
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
 
-	run, runErr := engine.Run(context.Background(), "self-correct")
+	run, runErr := engine.Run(context.Background(), "finish-self-correct")
 	if runErr != nil {
 		t.Fatalf("expected recovery, got error: %v", runErr)
 	}
@@ -589,7 +589,33 @@ func TestRun_TransitionRejection_FeedbackAndSelfCorrect(t *testing.T) {
 		t.Errorf("expected completed, got %s", run.Status)
 	}
 	if !p.sawFeedback {
-		t.Error("planner did not receive feedback after the rejected transition")
+		t.Error("planner did not receive feedback after rejected Finish")
+	}
+}
+
+type finishThenSelfCorrectPlanner struct {
+	step        int
+	sawFeedback bool
+}
+
+func (p *finishThenSelfCorrectPlanner) Plan(_ context.Context, req planner.PlanRequest) (agent.Decision, error) {
+	if req.Feedback != "" {
+		p.sawFeedback = true
+	}
+	p.step++
+	switch req.CurrentState {
+	case agent.StateIntake:
+		return agent.NewTransitionDecision(agent.StateExplore, "start"), nil
+	case agent.StateExplore:
+		if !p.sawFeedback {
+			// Illegal Finish — should soft-reject
+			return agent.NewFinishDecision("too early", nil), nil
+		}
+		return agent.NewTransitionDecision(agent.StateDecide, "go decide"), nil
+	case agent.StateDecide:
+		return agent.NewFinishDecision("done", nil), nil
+	default:
+		return agent.NewFailDecision("unexpected", nil), nil
 	}
 }
 

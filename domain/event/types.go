@@ -20,7 +20,8 @@ const (
 	TypeRunResumed   Type = "run.resumed"
 
 	// State machine events
-	TypeStateTransitioned Type = "state.transitioned"
+	TypeStateTransitioned       Type = "state.transitioned"
+	TypeStateTransitionRejected Type = "state.transition.rejected"
 
 	// Tool execution events
 	TypeToolCalled    Type = "tool.called"
@@ -80,6 +81,16 @@ type StateTransitionedPayload struct {
 	FromState agent.State `json:"from_state"`
 	ToState   agent.State `json:"to_state"`
 	Reason    string      `json:"reason"`
+}
+
+// StateTransitionRejectedPayload contains data for state.transition.rejected events.
+// Emitted when a Transition/Finish/Fail decision targets a disallowed state;
+// the run stays in FromState and the planner receives Feedback.
+type StateTransitionRejectedPayload struct {
+	FromState agent.State   `json:"from_state"`
+	Attempted agent.State   `json:"attempted"`
+	Reason    string        `json:"reason,omitempty"`
+	Allowed   []agent.State `json:"allowed,omitempty"`
 }
 
 // ToolCalledPayload contains data for tool.called events.

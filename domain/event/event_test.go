@@ -119,6 +119,7 @@ func TestEventTypes(t *testing.T) {
 		{event.TypeRunPaused, "run.paused"},
 		{event.TypeRunResumed, "run.resumed"},
 		{event.TypeStateTransitioned, "state.transitioned"},
+		{event.TypeStateTransitionRejected, "state.transition.rejected"},
 		{event.TypeToolCalled, "tool.called"},
 		{event.TypeToolSucceeded, "tool.succeeded"},
 		{event.TypeToolFailed, "tool.failed"},

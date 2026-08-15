@@ -86,6 +86,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"go.klarlabs.de/agent/application"
 	"go.klarlabs.de/agent/domain/agent"
@@ -774,9 +775,37 @@ func WithLogger(l *Logger) Option {
 // over importing infrastructure/resilience.
 type Executor = resilience.Executor
 
+// ExecutorOption configures a resilient executor.
+type ExecutorOption = resilience.Option
+
 // NewDefaultExecutor returns a resilient executor with default settings.
 func NewDefaultExecutor() *Executor {
 	return resilience.NewDefaultExecutor()
+}
+
+// NewExecutorWithOptions returns a resilient executor with the given options.
+func NewExecutorWithOptions(opts ...ExecutorOption) *Executor {
+	return resilience.NewExecutorWithOptions(opts...)
+}
+
+// WithExecutorTimeout sets the default tool execution timeout.
+func WithExecutorTimeout(d time.Duration) ExecutorOption {
+	return resilience.WithTimeout(d)
+}
+
+// WithExecutorMaxConcurrent sets the bulkhead concurrency limit.
+func WithExecutorMaxConcurrent(n int) ExecutorOption {
+	return resilience.WithMaxConcurrent(n)
+}
+
+// WithExecutorRetryAttempts sets max retries for idempotent tools.
+func WithExecutorRetryAttempts(n int) ExecutorOption {
+	return resilience.WithRetryAttempts(n)
+}
+
+// WithExecutorRetryDelay sets the initial retry backoff delay.
+func WithExecutorRetryDelay(d time.Duration) ExecutorOption {
+	return resilience.WithRetryDelay(d)
 }
 
 // GovernanceFactory constructs per-run governors. Prefer the api constructors
