@@ -302,5 +302,6 @@ func TestBudgetEnforcement(t *testing.T) {
 
 ## Next Steps
 
-- [Evidence](evidence.md) - How agents accumulate knowledge
-- [Ledger](ledger.md) - Audit trail for all operations
+- [States](states.md) - The canonical state machine
+- [Tools](tools.md) - Annotations that drive approval and risk
+- [Planners](planners.md) - Decisions that policies constrain
