@@ -1,5 +1,7 @@
 // Package secrets provides secret management tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for secret management:
 //   - secrets_get: Retrieve a secret by key
 //   - secrets_set: Store a secret
@@ -21,7 +23,7 @@ import (
 // Pack returns the secrets management tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("secrets").
-		WithDescription("Secret management tools for secure credential storage").
+		WithDescription("[STUB] Secret management tools for secure credential storage").
 		WithVersion("0.1.0").
 		AddTools(
 			secretsGet(),
@@ -33,6 +35,7 @@ func Pack() *pack.Pack {
 		).
 		AllowInState(agent.StateExplore, "secrets_list").
 		AllowInState(agent.StateAct, "secrets_get", "secrets_set", "secrets_delete", "secrets_list", "secrets_rotate", "secrets_version").
+		WithMetadata("status", "stub").
 		Build()
 }
 

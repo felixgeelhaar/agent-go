@@ -1,5 +1,7 @@
 // Package monitoring provides monitoring tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for observability and monitoring:
 //   - metrics_query: Query metrics from a time series database
 //   - metrics_push: Push custom metrics
@@ -22,7 +24,7 @@ import (
 // Pack returns the monitoring tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("monitoring").
-		WithDescription("Monitoring and observability tools").
+		WithDescription("[STUB] Monitoring and observability tools").
 		WithVersion("0.1.0").
 		AddTools(
 			metricsQuery(),
@@ -37,6 +39,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "metrics_query", "alerts_list", "logs_query", "traces_query", "health_check", "dashboard_get").
 		AllowInState(agent.StateAct, "metrics_query", "metrics_push", "alerts_list", "alerts_silence", "logs_query", "traces_query", "health_check", "dashboard_get").
 		AllowInState(agent.StateValidate, "metrics_query", "alerts_list", "health_check").
+		WithMetadata("status", "stub").
 		Build()
 }
 

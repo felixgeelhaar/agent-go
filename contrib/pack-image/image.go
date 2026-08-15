@@ -1,5 +1,7 @@
 // Package image provides image processing tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for image operations:
 //   - image_resize: Resize an image to specified dimensions
 //   - image_crop: Crop an image to specified region
@@ -22,7 +24,7 @@ import (
 // Pack returns the image processing tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("image").
-		WithDescription("Image processing and manipulation tools").
+		WithDescription("[STUB] Image processing and manipulation tools").
 		WithVersion("0.1.0").
 		AddTools(
 			imageResize(),
@@ -37,6 +39,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "image_metadata").
 		AllowInState(agent.StateAct, "image_resize", "image_crop", "image_convert", "image_compress", "image_rotate", "image_thumbnail", "image_metadata", "image_watermark").
 		AllowInState(agent.StateValidate, "image_metadata").
+		WithMetadata("status", "stub").
 		Build()
 }
 

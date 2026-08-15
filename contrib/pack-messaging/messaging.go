@@ -1,5 +1,7 @@
 // Package messaging provides message queue tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for message queue operations:
 //   - mq_publish: Publish a message to a topic/queue
 //   - mq_subscribe: Subscribe to messages from a topic/queue
@@ -21,7 +23,7 @@ import (
 // Pack returns the messaging tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("messaging").
-		WithDescription("Message queue tools for pub/sub and queue operations").
+		WithDescription("[STUB] Message queue tools for pub/sub and queue operations").
 		WithVersion("0.1.0").
 		AddTools(
 			mqPublish(),
@@ -34,6 +36,7 @@ func Pack() *pack.Pack {
 		).
 		AllowInState(agent.StateExplore, "mq_list_queues", "mq_queue_info").
 		AllowInState(agent.StateAct, "mq_publish", "mq_subscribe", "mq_ack", "mq_nack", "mq_list_queues", "mq_queue_info", "mq_purge").
+		WithMetadata("status", "stub").
 		Build()
 }
 

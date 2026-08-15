@@ -1,5 +1,7 @@
 // Package filesystem provides file system tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for file system operations:
 //   - fs_read_file: Read contents of a file
 //   - fs_write_file: Write contents to a file
@@ -22,7 +24,7 @@ import (
 // Pack returns the filesystem tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("filesystem").
-		WithDescription("File system tools for reading, writing, and managing files").
+		WithDescription("[STUB] File system tools for reading, writing, and managing files").
 		WithVersion("0.1.0").
 		AddTools(
 			readFile(),
@@ -37,6 +39,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "fs_read_file", "fs_list_dir", "fs_stat").
 		AllowInState(agent.StateAct, "fs_read_file", "fs_write_file", "fs_list_dir", "fs_stat", "fs_mkdir", "fs_remove", "fs_copy", "fs_move").
 		AllowInState(agent.StateValidate, "fs_read_file", "fs_list_dir", "fs_stat").
+		WithMetadata("status", "stub").
 		Build()
 }
 
