@@ -572,6 +572,27 @@ func (p *selfCorrectPlanner) Plan(_ context.Context, req planner.PlanRequest) (a
 	}
 }
 
+func TestRun_TransitionRejection_FeedbackAndSelfCorrect(t *testing.T) {
+	// A rejected transition is recoverable: the engine feeds it back, the planner
+	// sees it and chooses a valid transition, and the run completes.
+	p := &selfCorrectPlanner{}
+	engine, err := NewEngine(EngineConfig{Registry: newTestRegistry(), Planner: p})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	run, runErr := engine.Run(context.Background(), "self-correct")
+	if runErr != nil {
+		t.Fatalf("expected recovery, got error: %v", runErr)
+	}
+	if run.Status != agent.RunStatusCompleted {
+		t.Errorf("expected completed, got %s", run.Status)
+	}
+	if !p.sawFeedback {
+		t.Error("planner did not receive feedback after the rejected transition")
+	}
+}
+
 func TestRun_FinishFromExplore_SoftRejectedThenSelfCorrect(t *testing.T) {
 	// Finish is only valid from decide/validate under DefaultTransitions.
 	// Soft-reject + feedback lets the planner recover instead of failing the run.
