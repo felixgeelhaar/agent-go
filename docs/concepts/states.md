@@ -212,10 +212,10 @@ if err != nil {
 }
 
 switch run.Status {
-case agent.StatusDone:
+case agent.StatusCompleted:
     fmt.Println("Success:", run.Result)
 case agent.StatusFailed:
-    fmt.Println("Agent failed:", run.FailureReason)
+    fmt.Println("Agent failed:", run.Error)
 }
 ```
 

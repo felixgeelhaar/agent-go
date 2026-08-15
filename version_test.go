@@ -10,8 +10,8 @@ func TestVersion(t *testing.T) {
 	}
 
 	// Verify version matches the current release line
-	if Version != "0.15.0" {
-		t.Errorf("Version is %s, expected 0.15.0", Version)
+	if Version != "0.16.0" {
+		t.Errorf("Version is %s, expected 0.16.0", Version)
 	}
 }
 

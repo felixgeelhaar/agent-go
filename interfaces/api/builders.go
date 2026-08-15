@@ -204,6 +204,12 @@ func NewFailDecision(reason string, err error) Decision {
 	return agent.NewFailDecision(reason, err)
 }
 
+// NewAskHumanDecision creates a decision to pause and ask for human input.
+// Resume with Engine.ResumeWithInput after the operator answers.
+func NewAskHumanDecision(question string, options ...string) Decision {
+	return agent.NewAskHumanDecision(question, options...)
+}
+
 // AutoApprover returns an approver that automatically approves all requests.
 // This is a convenience function for development and testing.
 func AutoApprover() policy.Approver {

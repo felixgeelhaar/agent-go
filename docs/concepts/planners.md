@@ -12,14 +12,16 @@ type Planner interface {
 }
 
 type PlanRequest struct {
-    RunID        string              // Current run identifier
-    CurrentState State               // Where the agent is
-    Evidence     []Evidence          // What the agent has learned
-    AllowedTools []string            // Tools available in current state
-    Budgets      BudgetSnapshot      // Remaining budget limits
-    Vars         map[string]any      // User-defined variables
+    RunID        string
+    CurrentState State
+    Evidence     []Evidence
+    AllowedTools []string
+    Budgets      BudgetSnapshot
+    Vars         map[string]any
 }
 ```
+
+Import via `agent "go.klarlabs.de/agent/interfaces/api"` — `Planner` and `PlanRequest` are re-exported there.
 
 ## Decision Types
 
@@ -27,56 +29,51 @@ Planners return one of five decision types:
 
 ### CallTool
 
-Execute a tool with given input:
-
 ```go
 decision := agent.NewCallToolDecision(
-    "read_file",                              // Tool name
-    json.RawMessage(`{"path": "/tmp/x"}`),    // Input
-    "gathering information",                  // Reason
+    "read_file",
+    json.RawMessage(`{"path": "/tmp/x"}`),
+    "gathering information",
 )
 ```
 
 ### Transition
 
-Move to a different state:
-
 ```go
 decision := agent.NewTransitionDecision(
-    agent.StateAct,          // Target state
-    "ready to make changes", // Reason
+    agent.StateAct,
+    "ready to make changes",
 )
 ```
 
 ### Finish
 
-Complete successfully:
+Complete successfully. Under `DefaultTransitions`, **Finish is only valid from `decide` or `validate`** (those states may transition to `done`).
 
 ```go
 decision := agent.NewFinishDecision(
-    "task completed",                        // Reason
-    json.RawMessage(`{"result": "success"}`), // Result
+    "task completed",
+    json.RawMessage(`{"result": "success"}`),
 )
 ```
 
 ### Fail
 
-Terminate with failure:
-
 ```go
 decision := agent.NewFailDecision(
-    "cannot proceed without API key", // Reason
+    "cannot proceed without API key",
+    nil, // optional underlying error
 )
 ```
 
-### AskHuman (future)
+### AskHuman
 
-Request human input:
+Pause for human input, then resume with `engine.ResumeWithInput`:
 
 ```go
 decision := agent.NewAskHumanDecision(
-    "Should I delete these 100 files?",  // Question
-    []string{"yes", "no", "review"},     // Options
+    "Should I delete these 100 files?",
+    "yes", "no", "review",
 )
 ```
 
@@ -98,6 +95,10 @@ planner := agent.NewScriptedPlanner(
     },
     agent.ScriptStep{
         ExpectState: agent.StateExplore,
+        Decision:    agent.NewTransitionDecision(agent.StateDecide, "ready"),
+    },
+    agent.ScriptStep{
+        ExpectState: agent.StateDecide,
         Decision:    agent.NewFinishDecision("done", result),
     },
 )
@@ -107,156 +108,100 @@ planner := agent.NewScriptedPlanner(
 
 ### MockPlanner
 
-Returns a single fixed decision:
+Returns decisions in order (or a single fixed decision):
 
 ```go
 planner := agent.NewMockPlanner(
+    agent.NewTransitionDecision(agent.StateExplore, "start"),
+    agent.NewTransitionDecision(agent.StateDecide, "decide"),
     agent.NewFinishDecision("immediate finish", nil),
 )
 ```
 
 **Use for**: Simple tests, edge case testing
 
-### FunctionPlanner
+### RuleBasedPlanner / HybridPlanner
 
-Uses a custom function:
+Go-native rules evaluated in priority order; hybrid adds any fallback planner (for example an LLM):
 
 ```go
-planner := agent.NewFunctionPlanner(func(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
-    // Custom logic
-    if req.CurrentState == agent.StateIntake {
-        return agent.NewTransitionDecision(agent.StateExplore, "starting"), nil
-    }
+rules := agent.NewRuleBasedPlanner(
+    agent.NewFailDecision("no rule matched", nil),
+    // rules built with agent.NewRule(...)
+)
 
-    if len(req.Evidence) > 5 {
-        return agent.NewFinishDecision("enough info", nil), nil
-    }
-
-    return agent.NewCallToolDecision("gather_more", nil, "need more"), nil
-})
+hybrid := agent.NewHybridPlanner(rules, llmFallback)
 ```
 
-**Use for**: Testing specific behaviors, simple heuristics
+**Use for**: Deterministic business rules, with optional LLM fallback
 
 ## LLM Planners
 
-For production agents, use LLM-powered planners:
-
-### Anthropic (Claude)
+For production agents, use the contrib LLM planner module:
 
 ```go
-import "go.klarlabs.de/agent/infrastructure/planner/provider/anthropic"
-
-provider, _ := anthropic.New(
-    anthropic.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-    anthropic.WithModel("claude-sonnet-4-20250514"),
+import (
+    plannerllm "go.klarlabs.de/agent/contrib/planner-llm"
+    "go.klarlabs.de/agent/contrib/planner-llm/providers"
 )
 
-llmPlanner := planner.NewLLMPlanner(planner.LLMPlannerConfig{
-    Provider:     provider,
-    SystemPrompt: "You are a helpful file management agent...",
-    Temperature:  0.7,
+provider := providers.NewAnthropicProvider(providers.AnthropicConfig{
+    APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+    Model:  "claude-sonnet-4-20250514",
 })
+
+llmPlanner := plannerllm.NewPlanner(plannerllm.Config{
+    Provider:    provider,
+    Temperature: 0.7,
+    MaxTokens:   4096,
+})
+
+engine, _ := agent.New(agent.WithPlanner(llmPlanner), /* tools... */)
 ```
 
-### OpenAI (GPT-4)
-
-```go
-import "go.klarlabs.de/agent/infrastructure/planner/provider/openai"
-
-provider, _ := openai.New(
-    openai.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-    openai.WithModel("gpt-4-turbo"),
-)
-```
-
-### Google (Gemini)
-
-```go
-import "go.klarlabs.de/agent/infrastructure/planner/provider/gemini"
-
-provider, _ := gemini.New(
-    gemini.WithAPIKey(os.Getenv("GEMINI_API_KEY")),
-    gemini.WithModel("gemini-pro"),
-)
-```
-
-### Ollama (Local)
-
-```go
-import "go.klarlabs.de/agent/infrastructure/planner/provider/ollama"
-
-provider, _ := ollama.New(
-    ollama.WithBaseURL("http://localhost:11434"),
-    ollama.WithModel("llama3"),
-)
-```
+Other providers live under `contrib/planner-llm/providers` (OpenAI, Gemini, Ollama, Bedrock, Cohere, Copilot). See `example/04-llm-planner` for a runnable walkthrough.
 
 ## Creating Custom Planners
 
-### Basic Custom Planner
+Implement `agent.Planner`:
 
 ```go
 type MyPlanner struct {
-    rules []Rule
+    // ...
 }
 
 func (p *MyPlanner) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
-    // Apply rules in order
-    for _, rule := range p.rules {
-        if decision, ok := rule.Apply(req); ok {
-            return decision, nil
-        }
+    if req.CurrentState == agent.StateIntake {
+        return agent.NewTransitionDecision(agent.StateExplore, "starting"), nil
     }
-
-    // Default behavior
-    return agent.NewFailDecision("no applicable rule"), nil
+    if len(req.Evidence) > 5 {
+        return agent.NewTransitionDecision(agent.StateDecide, "enough info"), nil
+    }
+    if req.CurrentState == agent.StateDecide {
+        return agent.NewFinishDecision("done", nil), nil
+    }
+    return agent.NewCallToolDecision("gather_more", nil, "need more"), nil
 }
 ```
 
 ### Composite Planner
 
-Combine multiple planners:
-
 ```go
 type CompositeP struct {
-    primary   agent.Planner
-    fallback  agent.Planner
+    primary  agent.Planner
+    fallback agent.Planner
 }
 
 func (p *CompositeP) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
     decision, err := p.primary.Plan(ctx, req)
     if err != nil {
-        // Fall back to secondary planner
         return p.fallback.Plan(ctx, req)
     }
     return decision, nil
 }
 ```
 
-### Caching Planner
-
-Add caching to any planner:
-
-```go
-type CachingPlanner struct {
-    inner agent.Planner
-    cache map[string]agent.Decision
-}
-
-func (p *CachingPlanner) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
-    key := computeCacheKey(req)
-    if cached, ok := p.cache[key]; ok {
-        return cached, nil
-    }
-
-    decision, err := p.inner.Plan(ctx, req)
-    if err == nil {
-        p.cache[key] = decision
-    }
-    return decision, err
-}
-```
+Or use `agent.NewHybridPlanner` when the primary path is rule-based.
 
 ## Planner Guarantees
 
@@ -282,37 +227,37 @@ For testing, planners must support deterministic behavior (e.g., ScriptedPlanner
 
 ### 1. Test with ScriptedPlanner
 
-Always test your agent with deterministic planners first:
-
 ```go
 func TestAgentBehavior(t *testing.T) {
     planner := agent.NewScriptedPlanner(expectedSteps...)
 
-    engine, _ := agent.New(
+    engine, err := agent.New(
         agent.WithPlanner(planner),
-        agent.WithTools(tools...),
+        agent.WithTool(readTool),
+        agent.WithTool(writeTool),
     )
+    require.NoError(t, err)
 
     run, err := engine.Run(ctx, "test goal")
-    assert.NoError(t, err)
-    assert.Equal(t, agent.StatusDone, run.Status)
+    require.NoError(t, err)
+    assert.Equal(t, agent.StatusCompleted, run.Status)
 }
 ```
 
 ### 2. Separate Planning from Execution
 
-Don't let planners access tools directly:
+Don't let planners access tools or I/O directly:
 
 ```go
 // Good - planner only decides
-func (p *MyPlanner) Plan(ctx context.Context, req PlanRequest) (Decision, error) {
-    return NewCallToolDecision("read_file", input, "need info"), nil
+func (p *MyPlanner) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
+    return agent.NewCallToolDecision("read_file", input, "need info"), nil
 }
 
 // Bad - planner executes (violates separation)
-func (p *BadPlanner) Plan(ctx context.Context, req PlanRequest) (Decision, error) {
-    content, _ := os.ReadFile(path)  // Don't do this!
-    return NewFinishDecision("done", content), nil
+func (p *BadPlanner) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
+    content, _ := os.ReadFile(path) // Don't do this!
+    return agent.NewFinishDecision("done", content), nil
 }
 ```
 
@@ -322,43 +267,18 @@ Always provide a reason for decisions:
 
 ```go
 // Good - explains why
-NewCallToolDecision("delete_file", input, "file is temporary and task complete")
+agent.NewCallToolDecision("delete_file", input, "file is temporary and task complete")
 
 // Bad - no context
-NewCallToolDecision("delete_file", input, "")
+agent.NewCallToolDecision("delete_file", input, "")
 ```
 
-### 4. Respect Allowed Tools
+### 4. Respect Allowed Tools and Budgets
 
-Only suggest tools from `AllowedTools`:
-
-```go
-func (p *MyPlanner) Plan(ctx context.Context, req PlanRequest) (Decision, error) {
-    // Check if desired tool is allowed
-    for _, allowed := range req.AllowedTools {
-        if allowed == "write_file" {
-            return NewCallToolDecision("write_file", input, "updating"), nil
-        }
-    }
-    // Tool not available in current state
-    return NewTransitionDecision(StateAct, "need write access"), nil
-}
-```
-
-### 5. Handle Budget Exhaustion
-
-Check budgets before making decisions:
-
-```go
-func (p *MyPlanner) Plan(ctx context.Context, req PlanRequest) (Decision, error) {
-    if remaining, ok := req.Budgets["tool_calls"]; ok && remaining <= 0 {
-        return NewFailDecision("budget exhausted"), nil
-    }
-    // Continue normal planning...
-}
-```
+Only choose tools from `req.AllowedTools`, and check `req.Budgets` before long tool loops.
 
 ## Next Steps
 
-- [Policies](policies.md) - Enforcing limits on planner decisions
-- [Integration Guides](../integrations/) - Setting up LLM providers
+- [Policies](policies.md) - Budgets, approvals, eligibility
+- [Tools](tools.md) - Creating tools with annotations
+- [States](states.md) - The canonical state machine

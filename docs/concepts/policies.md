@@ -36,15 +36,17 @@ Budgets set hard limits on resource consumption.
 ```go
 engine, _ := agent.New(
     agent.WithBudget("tool_calls", 100),  // Max 100 tool calls
-    agent.WithBudget("tokens", 50000),     // Max 50k tokens
+    agent.WithBudget("tokens", 50000),     // Named budget (consume via middleware)
 )
 ```
+
+The engine automatically consumes the `tool_calls` budget on each successful tool execution. Other named budgets are available to planners via `PlanRequest.Budgets` and can be decremented with `BudgetFromContextMiddleware` in the middleware chain.
 
 ### How Budgets Work
 
 1. Each run starts with the configured budget
-2. Every tool call decrements the relevant budget
-3. When a budget hits zero, the engine stops
+2. Every successful tool call decrements `tool_calls` (when configured)
+3. When a budget cannot cover the next call, the engine stops
 4. Planners see remaining budgets in `PlanRequest.Budgets`
 
 ### Budget Exhaustion
@@ -53,28 +55,8 @@ When a budget is exhausted:
 
 ```go
 run, err := engine.Run(ctx, "Process all files")
-// err == nil, but:
+// err is policy.ErrBudgetExceeded (wrapped)
 // run.Status == agent.StatusFailed
-// run.FailureReason == "budget exhausted: tool_calls"
-```
-
-### Custom Budget Types
-
-Define domain-specific budgets:
-
-```go
-engine, _ := agent.New(
-    agent.WithBudget("api_calls", 50),      // Limit API requests
-    agent.WithBudget("database_queries", 20), // Limit DB access
-    agent.WithBudget("llm_tokens", 10000),   // Limit LLM usage
-)
-
-// Decrement in tool handler
-func apiHandler(ctx context.Context, input json.RawMessage) (tool.Result, error) {
-    budget := agent.BudgetFromContext(ctx)
-    budget.Decrement("api_calls", 1)
-    // ...
-}
 ```
 
 ### Budget Visibility
@@ -82,11 +64,11 @@ func apiHandler(ctx context.Context, input json.RawMessage) (tool.Result, error)
 Planners can see remaining budgets:
 
 ```go
-func (p *MyPlanner) Plan(ctx context.Context, req PlanRequest) (Decision, error) {
+func (p *MyPlanner) Plan(ctx context.Context, req agent.PlanRequest) (agent.Decision, error) {
     remaining := req.Budgets["tool_calls"]
     if remaining < 5 {
-        // Running low, wrap up
-        return NewFinishDecision("completing due to budget", result), nil
+        // Running low, wrap up — Finish is valid from decide/validate
+        return agent.NewFinishDecision("completing due to budget", result), nil
     }
     // Continue normal operation
 }
@@ -99,9 +81,7 @@ Approvals require human sign-off before executing risky operations.
 ### Setting Up Approval
 
 ```go
-// Create an approver
-approver := agent.NewCallbackApprover(func(ctx context.Context, req ApprovalRequest) (bool, error) {
-    // Show to user
+approver := agent.NewCallbackApprover(func(ctx context.Context, req agent.ApprovalRequest) (bool, error) {
     fmt.Printf("Approve %s with input %s? [y/n]: ", req.ToolName, req.Input)
     var response string
     fmt.Scanln(&response)
@@ -115,35 +95,21 @@ engine, _ := agent.New(
 
 ### What Triggers Approval
 
-By default, approval is required for:
+By default (via tool annotations), approval is required when a tool's annotations say so — typically:
 
 1. Tools marked `Destructive: true`
-2. Tools with `RiskLevel: RiskHigh` or `RiskLevel: RiskCritical`
-
-### Custom Approval Rules
-
-```go
-approver := agent.NewConditionalApprover(
-    // Always approve read-only tools
-    agent.ApproveIf(func(req ApprovalRequest) bool {
-        return req.Tool.Annotations().ReadOnly
-    }),
-    // Require approval for specific tools
-    agent.RequireApprovalFor("delete_file", "drop_table", "send_email"),
-    // Require approval above risk threshold
-    agent.RequireApprovalAboveRisk(agent.RiskMedium),
-)
-```
+2. Tools with high / critical risk levels (`ShouldRequireApproval()`)
 
 ### Approval Request Structure
 
 ```go
 type ApprovalRequest struct {
-    RunID    string          // Current run
-    Tool     tool.Tool       // Tool being called
-    Input    json.RawMessage // Input to the tool
-    State    agent.State     // Current state
-    Evidence []Evidence      // Accumulated evidence
+    RunID     string
+    ToolName  string
+    Input     json.RawMessage
+    Reason    string
+    RiskLevel string
+    Timestamp time.Time
 }
 ```
 
@@ -157,7 +123,7 @@ engine, _ := agent.New(
 
 // Or auto-deny everything
 engine, _ := agent.New(
-    agent.WithApprover(agent.DenyAllApprover()),
+    agent.WithApprover(agent.DenyApprover("denied in test")),
 )
 ```
 
@@ -171,15 +137,25 @@ Eligibility controls which tools are available in each state.
 eligibility := agent.NewToolEligibility()
 
 // Read-only tools in explore and validate
-eligibility.Allow(agent.StateExplore, "read_file", "list_dir", "search")
-eligibility.Allow(agent.StateValidate, "read_file", "verify_result")
+eligibility.AllowMultiple(agent.StateExplore, "read_file", "list_dir", "search")
+eligibility.AllowMultiple(agent.StateValidate, "read_file", "verify_result")
 
 // Destructive tools only in act
-eligibility.Allow(agent.StateAct, "write_file", "delete_file", "execute")
+eligibility.AllowMultiple(agent.StateAct, "write_file", "delete_file", "execute")
 
 engine, _ := agent.New(
     agent.WithToolEligibility(eligibility),
 )
+```
+
+Declarative form:
+
+```go
+eligibility := agent.NewToolEligibilityWith(agent.EligibilityRules{
+    agent.StateExplore:  {"read_file", "list_dir"},
+    agent.StateAct:      {"write_file", "delete_file"},
+    agent.StateValidate: {"read_file"},
+})
 ```
 
 ### How Eligibility Works
@@ -194,39 +170,24 @@ If a planner tries to call an ineligible tool:
 
 ```go
 // Planner requests write_file in explore state
-decision := NewCallToolDecision("write_file", input, "writing")
+decision := agent.NewCallToolDecision("write_file", input, "writing")
 
-// Engine rejects it
-// run.FailureReason == "tool write_file not eligible in state explore"
+// Engine rejects it — run ends failed
+// run.Status == agent.StatusFailed
+// error / message mentions the tool is not allowed in the current state
 ```
 
 ### Default Eligibility
 
-If no eligibility is configured, the engine uses sensible defaults:
+If you omit `WithToolEligibility`, the engine uses `NewDefaultToolEligibility()`:
 
 ```go
-// Default: ReadOnly tools in explore/validate, all tools in act
-defaultEligibility := agent.DefaultToolEligibility()
+// Wildcard allow in explore / decide / act / validate.
+// Intake and terminal states still deny tools.
+eligibility := agent.NewDefaultToolEligibility()
 ```
 
-### Dynamic Eligibility
-
-Eligibility can depend on runtime context:
-
-```go
-eligibility := agent.NewDynamicEligibility(func(state agent.State, tool tool.Tool) bool {
-    // Allow all tools if user is admin
-    if isAdmin := agent.VarFromContext(ctx, "is_admin"); isAdmin == true {
-        return true
-    }
-
-    // Normal eligibility rules
-    if state == agent.StateExplore {
-        return tool.Annotations().ReadOnly
-    }
-    return true
-})
-```
+Prefer an explicit allow-list in production. Pass `agent.NewToolEligibility()` (empty) for deny-by-default.
 
 ## Combining Policies
 
@@ -236,7 +197,6 @@ Policies work together to create layered protection:
 engine, _ := agent.New(
     // Layer 1: Hard budget limits
     agent.WithBudget("tool_calls", 50),
-    agent.WithBudget("tokens", 10000),
 
     // Layer 2: State-based tool restrictions
     agent.WithToolEligibility(eligibility),
@@ -248,28 +208,40 @@ engine, _ := agent.New(
 
 ### Enforcement Order
 
-1. **Eligibility Check**: Is the tool allowed in this state?
-2. **Budget Check**: Is there remaining budget?
-3. **Approval Check**: Does this tool require approval?
-4. **Execution**: Tool runs only if all checks pass
+1. **Structural act-gate**: Side-effecting tools only in states that allow side effects (`act`)
+2. **Eligibility check**: Is the tool allowed in this state?
+3. **Governance / budget**: Can the call proceed under remaining budget?
+4. **Approval**: Does this tool require approval?
+5. **Execution**: Tool runs only if all checks pass
 
 ## Policy Events
 
-Monitor policy enforcement:
+Watch policy outcomes through the event stream (requires `WithEventStore`):
 
 ```go
-engine, _ := agent.New(
-    agent.WithPolicyEventHandler(func(event PolicyEvent) {
-        switch event.Type {
-        case PolicyEventBudgetExhausted:
-            log.Warn("Budget exhausted", "budget", event.Budget)
-        case PolicyEventApprovalDenied:
-            log.Warn("Approval denied", "tool", event.Tool)
-        case PolicyEventEligibilityDenied:
-            log.Warn("Tool not eligible", "tool", event.Tool, "state", event.State)
-        }
-    }),
+import (
+    "go.klarlabs.de/agent/domain/event"
+    "go.klarlabs.de/agent/infrastructure/storage/memory"
 )
+
+store := memory.NewEventStore()
+engine, _ := agent.New(
+    agent.WithPlanner(planner),
+    agent.WithEventStore(store),
+    // ...
+)
+
+runID, events, _ := engine.Stream(ctx, "Process files")
+for evt := range events {
+    switch evt.Type {
+    case event.TypeBudgetExhausted:
+        log.Warn("budget exhausted", "run", runID)
+    case event.TypeApprovalDenied:
+        log.Warn("approval denied", "run", runID)
+    case event.TypeToolFailed:
+        log.Warn("tool failed", "run", runID, "payload", evt.Payload)
+    }
+}
 ```
 
 ## Best Practices
@@ -279,22 +251,19 @@ engine, _ := agent.New(
 Begin with tight limits and loosen as needed:
 
 ```go
-// Start tight
 agent.WithBudget("tool_calls", 10),
-
 // Expand after testing
 agent.WithBudget("tool_calls", 100),
 ```
 
-### 2. Use Multiple Budget Types
-
-Don't rely on a single budget:
+### 2. Prefer Explicit Eligibility
 
 ```go
-// Multiple safeguards
-agent.WithBudget("tool_calls", 100),    // Overall limit
-agent.WithBudget("write_ops", 10),       // Limit writes specifically
-agent.WithBudget("api_calls", 50),       // Limit external calls
+eligibility := agent.NewToolEligibilityWith(agent.EligibilityRules{
+    agent.StateExplore:  {"read_file", "list_dir"},
+    agent.StateAct:      {"write_file"},
+    agent.StateValidate: {"read_file"},
+})
 ```
 
 ### 3. Separate by Risk
@@ -302,51 +271,37 @@ agent.WithBudget("api_calls", 50),       // Limit external calls
 Different tools deserve different treatment:
 
 ```go
-// Low risk: broadly available
-eligibility.Allow(agent.StateExplore, lowRiskTools...)
-eligibility.Allow(agent.StateValidate, lowRiskTools...)
-eligibility.Allow(agent.StateAct, lowRiskTools...)
-
-// High risk: only in act with approval
-eligibility.Allow(agent.StateAct, highRiskTools...)
-// Plus approval requirement via annotations
+eligibility.AllowMultiple(agent.StateExplore, lowRiskTools...)
+eligibility.AllowMultiple(agent.StateValidate, lowRiskTools...)
+eligibility.AllowMultiple(agent.StateAct, lowRiskTools...)
+eligibility.AllowMultiple(agent.StateAct, highRiskTools...)
+// High-risk / destructive tools still go through approval via annotations
 ```
 
-### 4. Log Policy Decisions
+### 4. Observe via Events
 
-Make policy enforcement visible:
-
-```go
-agent.WithPolicyEventHandler(func(event PolicyEvent) {
-    logger.Info("policy decision",
-        "type", event.Type,
-        "tool", event.Tool,
-        "state", event.State,
-        "allowed", event.Allowed,
-    )
-})
-```
+Prefer `Stream` / `EventStore` over ad-hoc hooks so policy decisions land in the same audit trail as the rest of the run.
 
 ### 5. Test Policy Boundaries
-
-Verify policies work as expected:
 
 ```go
 func TestBudgetEnforcement(t *testing.T) {
     engine, _ := agent.New(
         agent.WithBudget("tool_calls", 2),
         agent.WithPlanner(plannerThatCallsToolsForever),
+        agent.WithTool(readTool),
     )
 
-    run, _ := engine.Run(ctx, "test")
+    run, err := engine.Run(ctx, "test")
 
+    assert.ErrorIs(t, err, policy.ErrBudgetExceeded)
     assert.Equal(t, agent.StatusFailed, run.Status)
-    assert.Contains(t, run.FailureReason, "budget exhausted")
-    assert.Equal(t, 2, run.StepCount)  // Stopped at limit
+    assert.Equal(t, 2, run.ConsumedToolCalls())
 }
 ```
 
 ## Next Steps
 
-- [Evidence](evidence.md) - How agents accumulate knowledge
-- [Ledger](ledger.md) - Audit trail for all operations
+- [States](states.md) - The canonical state machine
+- [Tools](tools.md) - Annotations that drive approval and risk
+- [Planners](planners.md) - Decisions that policies constrain

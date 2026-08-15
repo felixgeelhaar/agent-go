@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-15
+
+### Added
+- Implemented previously stubbed contrib packs (filesystem, image, pdf, vectordb,
+  llm, secrets, messaging, monitoring, shell, search, and related packs).
+- `sandbox` package (`SafePath`, host/command allow-lists) wired into filesystem,
+  image, pdf, shell, monitoring, and fileops packs.
+- Public API re-exports for `Executor`, `GovernanceFactory`, and
+  `NewAskHumanDecision`.
+- Planner contract sealed in `domain/planner` (re-exported via `interfaces/api`).
+
 ### Fixed
+- First-agent onboarding path: default tool eligibility is
+  `NewDefaultToolEligibility` when unset; README/quickstart match the real API
+  and canonical Finish-from-decide flow.
+- Concept docs aligned with the public API (removed aspirational symbols such as
+  `WithTools`, `StepCount`, `FailureReason`, `NewDynamicEligibility`).
 - Middleware options (`WithRateLimit`, `WithMiddleware`, etc.) append to the
   default policy chain instead of replacing eligibility/approval/validation.
 - `ContinueRun` and `ResumeWithInput` share `driveLoop` with loop detection
@@ -17,14 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EventStore/RunStore persistence failures fail the run when strict audit is
   enabled (default whenever an EventStore is configured); override with
   `WithStrictAudit`.
+- Custom states cannot enable side effects (`AllowsSideEffects` rejected at
+  register time).
 - Stub contrib packs are labeled `[STUB]` with `metadata.status=stub`.
 - `scripts/new-contrib.sh` no longer emits a local `replace` directive.
-- Docs/version alignment: `version.go` → 0.15.0; event/module counts; coverage
-  thresholds documented via `.coverctl.yaml`; CI reusable workflows pinned.
+- Contrib modules no longer ship local `replace` directives for the root module.
 
 ### Changed
+- Go module floor documented as **1.26.2+** (required by `go.klarlabs.de/axi`).
 - Evidence / AskHuman / Complete / TransitionTo gain `*At` clock-injected
   variants used by the engine for deterministic timestamps.
+- `version.go` → `0.16.0`.
 
 ## [0.15.0] - 2026-08-14
 
@@ -219,7 +238,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - go.opentelemetry.io/otel v1.39.0
 - And various cloud SDKs (AWS, GCP, Azure)
 
-[unreleased]: https://github.com/klarlabs-studio/agent-go/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/klarlabs-studio/agent-go/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/klarlabs-studio/agent-go/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/klarlabs-studio/agent-go/releases/tag/v0.15.0
 [0.7.0]: https://github.com/klarlabs-studio/agent-go/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/klarlabs-studio/agent-go/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/klarlabs-studio/agent-go/compare/v0.1.0...v0.5.0
