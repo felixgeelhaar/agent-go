@@ -8,7 +8,7 @@ version: "2"
 run:
   timeout: 5m
   tests: true
-  go: "1.25"
+  go: "1.26"
 
 linters:
   default: standard
@@ -54,12 +54,12 @@ linters:
         linters:
           - errcheck
       # Allow deprecated functions in cloud providers (GCS uses deprecated options)
-      - path: pack/cloud/
+      - path: contrib/pack-cloud/
         linters:
           - staticcheck
         text: SA1019
       # Allow deprecated kubernetes fake client in tests
-      - path: pack/kubernetes/pack_test\.go
+      - path: contrib/pack-kubernetes/pack_test\.go
         linters:
           - staticcheck
         text: SA1019

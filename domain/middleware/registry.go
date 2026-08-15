@@ -39,6 +39,16 @@ func (r *Registry) Len() int {
 	return len(r.middlewares)
 }
 
+// All returns a copy of the registered middleware in execution order.
+func (r *Registry) All() []Middleware {
+	if len(r.middlewares) == 0 {
+		return nil
+	}
+	out := make([]Middleware, len(r.middlewares))
+	copy(out, r.middlewares)
+	return out
+}
+
 // Clone creates a copy of the registry.
 func (r *Registry) Clone() *Registry {
 	clone := NewRegistry()

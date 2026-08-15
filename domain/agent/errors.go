@@ -27,6 +27,16 @@ var (
 	// e.g. the planner kept emitting self-transitions or repeats.
 	ErrNoProgress = errors.New("run aborted: no progress (possible loop)")
 
+	// ErrMaxSteps indicates the run was aborted because it reached MaxSteps
+	// without entering a terminal state.
+	ErrMaxSteps = errors.New("max steps exceeded")
+
+	// ErrAuditFailed indicates a configured EventStore or RunStore failed to
+	// persist an audit record. When strict audit is enabled (default whenever
+	// an EventStore is configured), this fails the run rather than silently
+	// dropping the audit trail.
+	ErrAuditFailed = errors.New("audit persistence failed")
+
 	// ErrTransitionRejected indicates a requested transition did not fire: the
 	// policy disallows it, or the state machine has no matching edge from the
 	// current state. The engine surfaces this to the planner as feedback rather

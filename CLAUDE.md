@@ -27,7 +27,7 @@ make test-coverage            # Run tests with coverage profile
 go test -race -v ./...
 
 # Coverage (coverctl)
-make coverage-check           # Check coverage threshold (80%)
+make coverage-check           # Check coverage thresholds (.coverctl.yaml)
 make coverage-report          # Generate detailed report
 make coverage-debt            # Show coverage debt by domain
 coverctl check --fail-under=80
@@ -237,7 +237,7 @@ Configured via `resilience.Executor`:
 
 ### Event Streaming
 
-The engine publishes 16 event types to an optional EventStore:
+The engine publishes 21 event types to an optional EventStore:
 
 - **Run lifecycle**: `run.started`, `run.completed`, `run.failed`, `run.paused`, `run.resumed`
 - **State machine**: `state.transitioned`
@@ -347,9 +347,11 @@ tool := api.NewToolBuilder("read_file").
 registry := api.NewToolRegistry()
 registry.Register(tool)
 
-// Configure eligibility — three patterns available:
+// Configure eligibility — three patterns available.
+// Engine default (when WithToolEligibility is omitted) is deny-all
+// via NewToolEligibility(); choose one of these explicitly:
 
-// Pattern 1: Default (wildcard) — all tools in explore, decide, act, validate
+// Pattern 1: Wildcard convenience — all tools in explore, decide, act, validate
 eligibility := api.NewDefaultToolEligibility()
 
 // Pattern 2: Explicit per-state — most restrictive, production recommended

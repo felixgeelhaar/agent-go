@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: klarlabs-studio/.github/.github/workflows/go-ci.yml@main
+    uses: klarlabs-studio/.github/.github/workflows/go-ci.yml@4b0f34c9c8efdfe6bb4aa9854e569f894f896118
     permissions:
       contents: read
       security-events: write

@@ -2,12 +2,12 @@
         security security-secrets security-diff \
         release-plan release-bump release-notes release-publish \
         check example help hooks \
-        workspace-sync workspace-tidy contrib-build contrib-test
+        workspace-sync workspace-tidy contrib-build contrib-test contrib-lint
 
 # Default target
 all: build test lint
 
-# Build (workspace-aware)
+# Build (core module packages only — use contrib-build for contrib/)
 build:
 	go build ./...
 
@@ -24,11 +24,11 @@ contrib-build:
 	done
 	@echo "All contrib modules built successfully"
 
-# Test (workspace-aware)
+# Test (core module packages only — use contrib-test for contrib/)
 test:
 	go test -race -v ./...
 
-# Test core only
+# Test core only (explicit package list)
 test-core:
 	go test -race -v ./domain/... ./application/... ./interfaces/... ./infrastructure/... ./test/...
 
@@ -41,11 +41,11 @@ contrib-test:
 	done
 	@echo "All contrib module tests passed"
 
-# Test with coverage
+# Test with coverage (core module)
 test-coverage:
 	go test -race -coverprofile=coverage.out ./...
 
-# Coverage analysis (coverctl)
+# Coverage analysis (coverctl) — thresholds in .coverctl.yaml
 coverage-check:
 	coverctl check
 
@@ -90,7 +90,7 @@ release-publish:
 release-validate:
 	relicta validate-release
 
-# Lint (workspace-aware)
+# Lint (core module packages only — use contrib-lint for contrib/)
 lint:
 	golangci-lint run ./...
 
@@ -98,6 +98,14 @@ lint:
 lint-core:
 	golangci-lint run ./domain/... ./application/... ./interfaces/... ./infrastructure/...
 
+# Lint all contrib modules
+contrib-lint:
+	@echo "Linting contrib modules..."
+	@for dir in contrib/*/; do \
+		echo "Linting $$dir"; \
+		(cd "$$dir" && golangci-lint run ./...) || exit 1; \
+	done
+	@echo "All contrib modules linted successfully"
 # Clean
 clean:
 	rm -f coverage.out
@@ -168,6 +176,7 @@ help:
 	@echo "    test             - Run tests with race detection (workspace)"
 	@echo "    test-core        - Run core tests only"
 	@echo "    contrib-test     - Test all contrib modules individually"
+	@echo "    contrib-lint     - Lint all contrib modules individually"
 	@echo "    test-coverage    - Run tests with coverage profile"
 	@echo ""
 	@echo "  Coverage (coverctl):"

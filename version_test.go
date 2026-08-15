@@ -9,9 +9,9 @@ func TestVersion(t *testing.T) {
 		t.Error("Version should not be empty")
 	}
 
-	// Verify version format (should be semver)
-	if Version != "0.1.0" {
-		t.Logf("Version is %s, expected 0.1.0", Version)
+	// Verify version matches the current release line
+	if Version != "0.15.0" {
+		t.Errorf("Version is %s, expected 0.15.0", Version)
 	}
 }
 

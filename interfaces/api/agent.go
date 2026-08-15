@@ -186,6 +186,22 @@ var (
 	// consecutive steps made no progress (no state change and no new evidence).
 	// Tune the threshold with WithMaxNoProgress.
 	ErrNoProgress = agent.ErrNoProgress
+
+	// ErrMaxSteps is returned when a run reaches MaxSteps without entering a
+	// terminal state.
+	ErrMaxSteps = agent.ErrMaxSteps
+
+	// ErrAuditFailed is returned when strict audit is enabled and a configured
+	// EventStore or RunStore fails to persist an audit record.
+	ErrAuditFailed = agent.ErrAuditFailed
+
+	// ErrTransitionRejected indicates a requested transition was rejected by
+	// policy or the state machine. The engine feeds this back to the planner
+	// rather than hard-failing on the first rejection.
+	ErrTransitionRejected = agent.ErrTransitionRejected
+
+	// ErrToolNotAllowed is returned when a tool is not eligible in the current state.
+	ErrToolNotAllowed = tool.ErrToolNotAllowed
 )
 
 // Re-export knowledge types for RAG capabilities.
@@ -290,6 +306,7 @@ func New(opts ...Option) (*Engine, error) {
 		Governance:    config.governance,
 		Logger:        config.logger,
 		Clock:         config.clock,
+		StrictAudit:   config.strictAudit,
 	}
 
 	engine, err := application.NewEngine(appConfig)
@@ -432,6 +449,7 @@ type engineConfig struct {
 	governance    governance.Factory
 	logger        *logging.Logger
 	clock         clock.Clock
+	strictAudit   *bool
 }
 
 // Option configures the Engine.
@@ -554,11 +572,10 @@ func WithMaxNoProgress(n int) Option {
 	}
 }
 
-// WithMiddleware sets a custom middleware registry for tool execution.
-// If not set, the engine uses a default middleware chain with:
-// - Eligibility middleware (tool access control per state)
-// - Approval middleware (human approval for destructive tools)
-// - Logging middleware (execution timing and results)
+// WithMiddleware appends middleware to the engine's default policy chain.
+// The default chain always includes validation, eligibility, approval (when
+// governance does not own it), and logging — caller middleware cannot replace
+// those policy gates. Use this for rate limiting, metrics, caching, etc.
 func WithMiddleware(middlewares ...middleware.Middleware) Option {
 	return func(c *engineConfig) {
 		if c.middleware == nil {
@@ -689,10 +706,21 @@ func WithRunStore(s run.Store) Option {
 }
 
 // WithEventStore sets the event store for event sourcing and streaming.
-// Required for the Stream() method to work.
+// Required for the Stream() method to work. When an event store is configured,
+// strict audit is enabled by default (Append failures fail the run).
 func WithEventStore(s event.Store) Option {
 	return func(c *engineConfig) {
 		c.eventStore = s
+	}
+}
+
+// WithStrictAudit overrides audit persistence failure handling. When true,
+// EventStore.Append and RunStore Save/Update errors fail the run. When false,
+// persistence errors are logged and the run continues. The default is true
+// whenever an EventStore is configured.
+func WithStrictAudit(strict bool) Option {
+	return func(c *engineConfig) {
+		c.strictAudit = &strict
 	}
 }
 

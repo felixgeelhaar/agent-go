@@ -359,8 +359,8 @@ func TestRun_MaxStepsEnforced(t *testing.T) {
 	ctx := context.Background()
 	run, runErr := engine.Run(ctx, "test max steps")
 
-	if runErr == nil || runErr.Error() != "max steps exceeded" {
-		t.Errorf("expected max steps exceeded error, got %v", runErr)
+	if !errors.Is(runErr, agent.ErrMaxSteps) {
+		t.Errorf("expected ErrMaxSteps, got %v", runErr)
 	}
 	if run.Status != agent.RunStatusFailed {
 		t.Errorf("expected run to fail, got status %s", run.Status)
@@ -1480,8 +1480,8 @@ func TestRun_MaxSteps_OneStepShort(t *testing.T) {
 	}
 
 	run, runErr := engine.Run(context.Background(), "test one step short")
-	if runErr == nil || runErr.Error() != "max steps exceeded" {
-		t.Errorf("expected max steps exceeded, got %v", runErr)
+	if !errors.Is(runErr, agent.ErrMaxSteps) {
+		t.Errorf("expected ErrMaxSteps, got %v", runErr)
 	}
 	if run.Status != agent.RunStatusFailed {
 		t.Errorf("expected failed, got %s", run.Status)
