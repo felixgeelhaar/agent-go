@@ -1,5 +1,7 @@
 // Package pdf provides PDF processing tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for PDF operations:
 //   - pdf_extract_text: Extract text content from a PDF
 //   - pdf_extract_images: Extract images from a PDF
@@ -22,7 +24,7 @@ import (
 // Pack returns the PDF processing tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("pdf").
-		WithDescription("PDF processing and manipulation tools").
+		WithDescription("[STUB] PDF processing and manipulation tools").
 		WithVersion("0.1.0").
 		AddTools(
 			pdfExtractText(),
@@ -37,6 +39,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "pdf_extract_text", "pdf_metadata").
 		AllowInState(agent.StateAct, "pdf_extract_text", "pdf_extract_images", "pdf_metadata", "pdf_merge", "pdf_split", "pdf_compress", "pdf_to_images", "pdf_from_html").
 		AllowInState(agent.StateValidate, "pdf_metadata").
+		WithMetadata("status", "stub").
 		Build()
 }
 

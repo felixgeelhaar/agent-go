@@ -1,5 +1,7 @@
 // Package llm provides LLM completion tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for LLM operations:
 //   - llm_complete: Generate text completion
 //   - llm_chat: Have a multi-turn conversation
@@ -21,7 +23,7 @@ import (
 // Pack returns the LLM tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("llm").
-		WithDescription("LLM completion and text processing tools").
+		WithDescription("[STUB] LLM completion and text processing tools").
 		WithVersion("0.1.0").
 		AddTools(
 			llmComplete(),
@@ -35,6 +37,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "llm_complete", "llm_chat", "llm_embed", "llm_summarize", "llm_extract", "llm_classify", "llm_translate").
 		AllowInState(agent.StateAct, "llm_complete", "llm_chat", "llm_embed", "llm_summarize", "llm_extract", "llm_classify", "llm_translate").
 		AllowInState(agent.StateDecide, "llm_complete", "llm_chat").
+		WithMetadata("status", "stub").
 		Build()
 }
 
