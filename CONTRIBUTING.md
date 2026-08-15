@@ -12,6 +12,11 @@ go build ./...
 go test -race -short ./...
 ```
 
+**Go version:** agent-go requires **Go 1.26.2+**. The floor is set by
+`go.klarlabs.de/axi` (governance). Other Klarlabs deps (`statekit`, `fortify`,
+`bolt`) allow 1.25+, but axi does not — do not lower the `go` directive in
+`go.mod` without an axi release that does.
+
 ## Project Structure
 
 - `domain/` — Core domain layer (no external dependencies)

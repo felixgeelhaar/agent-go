@@ -490,7 +490,7 @@ func WithPlanner(p domainplanner.Planner) Option {
 }
 
 // WithExecutor sets the resilient executor.
-func WithExecutor(e *resilience.Executor) Option {
+func WithExecutor(e *Executor) Option {
 	return func(c *engineConfig) {
 		c.executor = e
 	}
@@ -545,11 +545,11 @@ func WithBudgets(budgets map[string]int) Option {
 // the destructive-tool approval gate to an axi.Kernel (AxiFactory) while the
 // run-level budget stays in agent-go.
 //
-// Use governance.NewKernelFactory(approver) for full delegation — each run
+// Use api.NewKernelFactory(approver) for full delegation — each run
 // executes as one axi session so budget, approval, and evidence are all
-// axi-native. Use governance.NewPassthroughFactory(approver) to keep budget
+// axi-native. Use api.NewPassthroughFactory(approver) to keep budget
 // and approval fully in-process (approval via the engine middleware).
-func WithGovernance(f governance.Factory) Option {
+func WithGovernance(f GovernanceFactory) Option {
 	return func(c *engineConfig) {
 		c.governance = f
 	}
@@ -769,11 +769,36 @@ type LoggerConfig = logging.Config
 //
 //	logger := api.NewLoggerFromConfig(api.LoggerConfig{Level: "info", Format: "json"})
 //	engine, _ := api.New(api.WithPlanner(p), api.WithLogger(logger))
-func WithLogger(l *logging.Logger) Option {
+func WithLogger(l *Logger) Option {
 	return func(c *engineConfig) {
 		c.logger = l
 	}
 }
+
+// Executor is the resilient tool executor. Prefer api.NewDefaultExecutor
+// over importing infrastructure/resilience.
+type Executor = resilience.Executor
+
+// NewDefaultExecutor returns a resilient executor with default settings.
+func NewDefaultExecutor() *Executor {
+	return resilience.NewDefaultExecutor()
+}
+
+// GovernanceFactory constructs per-run governors. Prefer the api constructors
+// below over importing infrastructure/governance.
+type GovernanceFactory = governance.Factory
+
+// NewKernelFactory returns a factory that fully delegates budget, approval,
+// and evidence to one axi session per run.
+var NewKernelFactory = governance.NewKernelFactory
+
+// NewPassthroughFactory returns a factory that keeps budget and approval
+// in-process (approval via engine middleware).
+var NewPassthroughFactory = governance.NewPassthroughFactory
+
+// NewAxiFactory returns a factory that delegates only destructive-tool
+// approval to axi while keeping run-level budget in agent-go (the default).
+var NewAxiFactory = governance.NewAxiFactory
 
 // Clock abstracts the source of wall-clock time for the runtime.
 type Clock = clock.Clock

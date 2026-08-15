@@ -38,6 +38,7 @@ import (
 	"go.klarlabs.de/agent/domain/agent"
 	"go.klarlabs.de/agent/domain/pack"
 	"go.klarlabs.de/agent/domain/tool"
+	"go.klarlabs.de/agent/sandbox"
 )
 
 // Pack returns the file operations tools pack.
@@ -67,34 +68,8 @@ func Pack(baseDir string) *pack.Pack {
 
 // --- Path security ---
 
-// safePath resolves a user-provided path relative to baseDir and ensures
-// it does not escape the sandbox. Returns the absolute path or an error.
 func safePath(baseDir, userPath string) (string, error) {
-	fullPath := filepath.Join(baseDir, filepath.Clean(userPath))
-	if !isSubPath(baseDir, fullPath) {
-		return "", fmt.Errorf("path traversal attempt: %s", userPath)
-	}
-	return fullPath, nil
-}
-
-// isSubPath checks if the given path is under the base directory.
-func isSubPath(base, path string) bool {
-	absBase, err := filepath.Abs(base)
-	if err != nil {
-		return false
-	}
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return false
-	}
-	rel, err := filepath.Rel(absBase, absPath)
-	if err != nil {
-		return false
-	}
-	if rel == "." {
-		return true
-	}
-	return !filepath.IsAbs(rel) && !strings.HasPrefix(rel, "..")
+	return sandbox.SafePath(baseDir, userPath)
 }
 
 // --- Input/Output types ---
@@ -947,7 +922,7 @@ func extractZip(archivePath, outputDir, baseDir string) (int, error) {
 	for _, zf := range r.File {
 		// Validate extracted path stays within sandbox
 		destPath := filepath.Join(outputDir, filepath.Clean(zf.Name))
-		if !isSubPath(baseDir, destPath) {
+		if !sandbox.IsUnderBase(baseDir, destPath) {
 			return count, fmt.Errorf("zip contains path traversal entry: %s", zf.Name)
 		}
 
@@ -1015,7 +990,7 @@ func extractTar(archivePath, outputDir, baseDir string, compressed bool) (int, e
 		}
 
 		destPath := filepath.Join(outputDir, filepath.Clean(header.Name))
-		if !isSubPath(baseDir, destPath) {
+		if !sandbox.IsUnderBase(baseDir, destPath) {
 			return count, fmt.Errorf("tar contains path traversal entry: %s", header.Name)
 		}
 

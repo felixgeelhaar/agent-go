@@ -8,7 +8,6 @@ import (
 
 	"go.klarlabs.de/agent/domain/tool"
 	"go.klarlabs.de/agent/infrastructure/planner"
-	"go.klarlabs.de/agent/infrastructure/resilience"
 	"go.klarlabs.de/agent/infrastructure/storage/filesystem"
 	api "go.klarlabs.de/agent/interfaces/api"
 )
@@ -253,7 +252,7 @@ func TestNew_WithExecutor(t *testing.T) {
 	t.Run("creates engine with custom executor", func(t *testing.T) {
 		t.Parallel()
 
-		executor := resilience.NewDefaultExecutor()
+		executor := api.NewDefaultExecutor()
 
 		mockPlanner := api.NewMockPlanner(
 			api.NewFinishDecision("done", nil),

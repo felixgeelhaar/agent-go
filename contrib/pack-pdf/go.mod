@@ -6,7 +6,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/pdfcpu/pdfcpu v0.11.1
 	github.com/phpdave11/gofpdf v1.4.2
-	go.klarlabs.de/agent v0.15.0
+	go.klarlabs.de/agent v0.15.1-0.20260815153923-14af654b79bf
 )
 
 require (
@@ -22,5 +22,3 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-replace go.klarlabs.de/agent => ../..
