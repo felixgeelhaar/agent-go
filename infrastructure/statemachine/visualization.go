@@ -125,16 +125,11 @@ func (d *MachineDefinition) ExportMermaid() string {
 		}
 	}
 
-	// Add notes for states with side effects
+	// Add notes for states with side effects (canonical act only; custom
+	// states cannot opt in).
 	for _, s := range agent.AllStates() {
 		if s.AllowsSideEffects() {
 			fmt.Fprintf(&b, "    note right of %s : Side effects allowed\n", s)
-		}
-	}
-
-	for _, cs := range d.StateRegistry.All() {
-		if cs.AllowsSideEffects {
-			fmt.Fprintf(&b, "    note right of %s : Side effects allowed\n", cs.Name)
 		}
 	}
 
@@ -155,11 +150,8 @@ func (d *MachineDefinition) isTerminal(s agent.State) bool {
 	return d.StateRegistry.IsTerminal(s)
 }
 
-// allowsSideEffects checks whether a state allows side effects, considering
-// both canonical and custom states.
+// allowsSideEffects reports whether a state allows side effects. Only the
+// canonical act state may; custom states are rejected at registration.
 func (d *MachineDefinition) allowsSideEffects(s agent.State) bool {
-	if s.AllowsSideEffects() {
-		return true
-	}
 	return d.StateRegistry.AllowsSideEffects(s)
 }

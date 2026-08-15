@@ -78,8 +78,8 @@ type CustomState struct {
 	// Name is the stable string identifier for the state.
 	Name State
 
-	// AllowsSideEffects indicates whether tools with side effects may execute
-	// in this state. Only the canonical "act" state allows this by default.
+	// AllowsSideEffects must be false. Only the canonical act state may permit
+	// side-effecting tools (invariant 5). Register rejects true.
 	AllowsSideEffects bool
 
 	// Terminal indicates whether this is a terminal (final) state.
@@ -107,13 +107,17 @@ func NewStateRegistry() *StateRegistry {
 
 // Register adds a custom state to the registry.
 // Returns an error if the state name conflicts with a canonical state or
-// a previously registered custom state.
+// a previously registered custom state, or if AllowsSideEffects is true
+// (only the canonical act state may permit side effects).
 func (r *StateRegistry) Register(cs CustomState) error {
 	if cs.Name == "" {
 		return ErrInvalidState
 	}
 	if cs.Name.IsValid() {
 		return ErrCustomStateConflict
+	}
+	if cs.AllowsSideEffects {
+		return ErrCustomSideEffectsForbidden
 	}
 	if _, exists := r.custom[cs.Name]; exists {
 		return ErrCustomStateDuplicate
@@ -143,16 +147,11 @@ func (r *StateRegistry) IsTerminal(s State) bool {
 	return false
 }
 
-// AllowsSideEffects returns true if the state permits side-effect operations,
-// checking both canonical and custom states.
+// AllowsSideEffects returns true only for the canonical act state.
+// Custom states cannot opt into side effects (Register rejects that flag);
+// this method remains fail-closed even if a registry were constructed incorrectly.
 func (r *StateRegistry) AllowsSideEffects(s State) bool {
-	if s.AllowsSideEffects() {
-		return true
-	}
-	if cs, exists := r.custom[s]; exists {
-		return cs.AllowsSideEffects
-	}
-	return false
+	return s.AllowsSideEffects()
 }
 
 // Get returns the custom state definition, or an empty CustomState and false

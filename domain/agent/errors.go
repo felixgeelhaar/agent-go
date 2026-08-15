@@ -27,6 +27,16 @@ var (
 	// e.g. the planner kept emitting self-transitions or repeats.
 	ErrNoProgress = errors.New("run aborted: no progress (possible loop)")
 
+	// ErrMaxSteps indicates the run was aborted because it reached MaxSteps
+	// without entering a terminal state.
+	ErrMaxSteps = errors.New("max steps exceeded")
+
+	// ErrAuditFailed indicates a configured EventStore or RunStore failed to
+	// persist an audit record. When strict audit is enabled (default whenever
+	// an EventStore is configured), this fails the run rather than silently
+	// dropping the audit trail.
+	ErrAuditFailed = errors.New("audit persistence failed")
+
 	// ErrTransitionRejected indicates a requested transition did not fire: the
 	// policy disallows it, or the state machine has no matching edge from the
 	// current state. The engine surfaces this to the planner as feedback rather
@@ -44,4 +54,9 @@ var (
 
 	// ErrCustomStateDuplicate indicates a custom state with the same name is already registered.
 	ErrCustomStateDuplicate = errors.New("custom state already registered")
+
+	// ErrCustomSideEffectsForbidden indicates a custom state attempted to opt into
+	// side effects. Only the canonical act state may allow side-effecting tools
+	// (design invariant: state semantics).
+	ErrCustomSideEffectsForbidden = errors.New("custom states cannot allow side effects; only act may")
 )

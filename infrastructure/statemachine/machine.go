@@ -33,6 +33,10 @@ type Context struct {
 	// e.g. that the previous transition was rejected. The engine sets it and
 	// clears it after threading it into the next PlanRequest.
 	Feedback string
+	// AuditFailure records the first EventStore/RunStore persistence error
+	// observed during the run when strict audit is enabled. The drive loop
+	// fails the run when this is set so audit gaps are never silent.
+	AuditFailure error
 }
 
 // NewContext creates a new machine context.

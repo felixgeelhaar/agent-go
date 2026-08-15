@@ -60,7 +60,9 @@ type Annotations struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
-// DefaultAnnotations returns annotations with safe defaults.
+// DefaultAnnotations returns conservative annotations: tools are treated as
+// side-effecting (HasSideEffects == true) until explicitly marked ReadOnly.
+// Prefer ReadOnlyAnnotations() for tools that only observe state.
 func DefaultAnnotations() Annotations {
 	return Annotations{
 		ReadOnly:         false,

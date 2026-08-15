@@ -1,5 +1,7 @@
 // Package shell provides shell command execution tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for executing shell commands:
 //   - shell_exec: Execute a shell command and return output
 //   - shell_exec_background: Execute a command in the background
@@ -18,7 +20,7 @@ import (
 // Pack returns the shell tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("shell").
-		WithDescription("Shell command execution tools").
+		WithDescription("[STUB] Shell command execution tools").
 		WithVersion("0.1.0").
 		AddTools(
 			shellExec(),
@@ -26,6 +28,7 @@ func Pack() *pack.Pack {
 			shellScript(),
 		).
 		AllowInState(agent.StateAct, "shell_exec", "shell_exec_background", "shell_script").
+		WithMetadata("status", "stub").
 		Build()
 }
 

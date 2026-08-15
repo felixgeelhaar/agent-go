@@ -2,6 +2,7 @@ package tool_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"go.klarlabs.de/agent/domain/tool"
@@ -177,6 +178,60 @@ func TestSchema_Validate(t *testing.T) {
 		err := schema.Validate(json.RawMessage(`{invalid`))
 		if err == nil {
 			t.Error("Validate() should return error for invalid JSON")
+		}
+	})
+
+	t.Run("wrong top-level type fails", func(t *testing.T) {
+		t.Parallel()
+
+		schema := tool.NewSchema(json.RawMessage(`{"type": "object"}`))
+		err := schema.Validate(json.RawMessage(`"not-an-object"`))
+		if err == nil {
+			t.Fatal("Validate() should reject non-object")
+		}
+		if !errors.Is(err, tool.ErrInvalidInput) {
+			t.Fatalf("expected ErrInvalidInput, got %v", err)
+		}
+	})
+
+	t.Run("missing required property fails", func(t *testing.T) {
+		t.Parallel()
+
+		schema := tool.ObjectSchema(
+			map[string]json.RawMessage{"name": json.RawMessage(`{"type":"string"}`)},
+			[]string{"name"},
+		)
+		err := schema.Validate(json.RawMessage(`{}`))
+		if err == nil {
+			t.Fatal("Validate() should reject missing required property")
+		}
+	})
+
+	t.Run("property type mismatch fails", func(t *testing.T) {
+		t.Parallel()
+
+		schema := tool.ObjectSchema(
+			map[string]json.RawMessage{"age": json.RawMessage(`{"type":"integer"}`)},
+			nil,
+		)
+		err := schema.Validate(json.RawMessage(`{"age":"twelve"}`))
+		if err == nil {
+			t.Fatal("Validate() should reject wrong property type")
+		}
+	})
+
+	t.Run("valid object with required properties passes", func(t *testing.T) {
+		t.Parallel()
+
+		schema := tool.ObjectSchema(
+			map[string]json.RawMessage{
+				"name": json.RawMessage(`{"type":"string"}`),
+				"age":  json.RawMessage(`{"type":"integer"}`),
+			},
+			[]string{"name"},
+		)
+		if err := schema.Validate(json.RawMessage(`{"name":"Ada","age":36}`)); err != nil {
+			t.Fatalf("Validate() error = %v", err)
 		}
 	})
 }

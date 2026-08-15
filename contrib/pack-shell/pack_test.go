@@ -11,6 +11,9 @@ func TestPack(t *testing.T) {
 	if p == nil {
 		t.Fatal("Pack() returned nil")
 	}
+	if p.Metadata["status"] != "stub" {
+		t.Fatalf("expected stub metadata, got %q", p.Metadata["status"])
+	}
 	if p.Name != "shell" {
 		t.Errorf("expected pack name 'shell', got %q", p.Name)
 	}

@@ -1,5 +1,7 @@
 // Package vectordb provides vector database tools for agent-go.
 //
+// STUB: Tools have no handlers and return ErrNoHandler at execution.
+//
 // This pack includes tools for vector database operations:
 //   - vector_upsert: Insert or update vectors
 //   - vector_query: Query for similar vectors
@@ -22,7 +24,7 @@ import (
 // Pack returns the vector database tools pack.
 func Pack() *pack.Pack {
 	return pack.NewBuilder("vectordb").
-		WithDescription("Vector database tools for similarity search").
+		WithDescription("[STUB] Vector database tools for similarity search").
 		WithVersion("0.1.0").
 		AddTools(
 			vectorUpsert(),
@@ -37,6 +39,7 @@ func Pack() *pack.Pack {
 		AllowInState(agent.StateExplore, "vector_query", "vector_fetch", "vector_list", "vector_describe_index").
 		AllowInState(agent.StateAct, "vector_upsert", "vector_query", "vector_delete", "vector_fetch", "vector_list", "vector_create_index", "vector_delete_index", "vector_describe_index").
 		AllowInState(agent.StateValidate, "vector_query", "vector_fetch", "vector_describe_index").
+		WithMetadata("status", "stub").
 		Build()
 }
 

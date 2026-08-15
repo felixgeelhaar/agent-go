@@ -41,14 +41,14 @@ agent-go is more than a single-agent engine — it's a **policy-aware, event-dri
 |-----------|-------------|
 | **Multi-agent coordination** | DelegateTool wraps child engines as tools. TaskContext shares state across agent hierarchies. |
 | **Agent protocol** | Message envelope with correlation IDs, capability discovery, trust boundaries, request-reply and broadcast patterns. |
-| **Event streaming** | `Stream()` returns a real-time channel of 12 event types. Powers dashboards, debugging, and orchestration. |
+| **Event streaming** | `Stream()` returns a real-time channel of 21 event types. Powers dashboards, debugging, and orchestration. |
 | **MCP integration** | Expose tools via Model Context Protocol with full policy enforcement (approval, budgets, audit trail). |
 | **Replay and fork** | Replay historical runs from events. Fork runs at any step for simulation and testing. |
 | **Shared memory** | Cross-agent TaskContext with thread-safe shared variables, evidence, and artifact references. |
 | **WASM sandbox** | Isolate tool execution with wazero (memory limits, time limits, filesystem restrictions). |
 | **Dashboard** | Real-time web UI with SSE event stream, run history, and evidence viewer. |
 | **CLI (agentctl)** | `run`, `validate`, `visualize`, `repl` commands for development and debugging. |
-| **134 contrib modules** | Storage backends (SQLite, PostgreSQL, Redis, etc.), 118 tool packs, 7 LLM planner providers. |
+| **141 contrib modules** | Storage backends (SQLite, PostgreSQL, Redis, etc.), 119 tool packs, LLM planner providers. |
 
 > **See it in action**: `go run ./example/flagship` — 3 agents, shared state, streaming, persistence, budgets, and approval in one program.
 

@@ -103,8 +103,12 @@ func TestStateRegistry_AllowsSideEffects(t *testing.T) {
 	t.Parallel()
 
 	reg := agent.NewStateRegistry()
-	_ = reg.Register(agent.CustomState{Name: agent.State("execute"), AllowsSideEffects: true})
-	_ = reg.Register(agent.CustomState{Name: agent.State("plan"), AllowsSideEffects: false})
+	if err := reg.Register(agent.CustomState{Name: agent.State("execute"), AllowsSideEffects: true}); err == nil {
+		t.Fatal("Register() should reject custom side-effect states")
+	}
+	if err := reg.Register(agent.CustomState{Name: agent.State("plan"), AllowsSideEffects: false}); err != nil {
+		t.Fatalf("Register() plan: %v", err)
+	}
 
 	tests := []struct {
 		state      agent.State
@@ -112,7 +116,7 @@ func TestStateRegistry_AllowsSideEffects(t *testing.T) {
 	}{
 		{agent.StateAct, true},
 		{agent.StateExplore, false},
-		{agent.State("execute"), true},
+		{agent.State("execute"), false}, // never registered
 		{agent.State("plan"), false},
 	}
 
@@ -123,6 +127,22 @@ func TestStateRegistry_AllowsSideEffects(t *testing.T) {
 				t.Errorf("AllowsSideEffects(%s) = %v, want %v", tt.state, got, tt.sideEffect)
 			}
 		})
+	}
+}
+
+func TestStateRegistry_RejectsCustomSideEffects(t *testing.T) {
+	t.Parallel()
+
+	reg := agent.NewStateRegistry()
+	err := reg.Register(agent.CustomState{
+		Name:              agent.State("execute"),
+		AllowsSideEffects: true,
+	})
+	if err != agent.ErrCustomSideEffectsForbidden {
+		t.Fatalf("Register() error = %v, want %v", err, agent.ErrCustomSideEffectsForbidden)
+	}
+	if reg.IsValid(agent.State("execute")) {
+		t.Error("rejected custom state must not be registered")
 	}
 }
 

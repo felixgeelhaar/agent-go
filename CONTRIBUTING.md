@@ -29,7 +29,7 @@ go test -race -short ./...
 ```bash
 make test                    # All tests with race detection
 make test-coverage           # Tests with coverage profile
-make coverage-check          # Check 80% threshold
+make coverage-check          # Check coverage thresholds (.coverctl.yaml)
 make security                # Security scans
 make lint                    # Lint
 make check                   # All CI checks

@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"go.klarlabs.de/agent/domain/agent"
@@ -126,6 +127,53 @@ func TestWithRateLimit(t *testing.T) {
 	}
 	if engine == nil {
 		t.Fatal("engine is nil")
+	}
+}
+
+func TestWithRateLimit_PreservesEligibility(t *testing.T) {
+	t.Parallel()
+
+	readTool := api.NewToolBuilder("read_file").
+		WithDescription("Reads a file").
+		WithAnnotations(api.Annotations{ReadOnly: true}).
+		WithHandler(func(_ context.Context, _ json.RawMessage) (tool.Result, error) {
+			return tool.Result{Output: json.RawMessage(`{}`)}, nil
+		}).
+		MustBuild()
+
+	registry := api.NewToolRegistry()
+	if err := registry.Register(readTool); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	// Deny-all eligibility: read_file is not allowed in explore.
+	eligibility := api.NewToolEligibility()
+
+	planner := api.NewScriptedPlanner(
+		api.ScriptStep{
+			ExpectState: api.StateIntake,
+			Decision:    api.NewTransitionDecision(api.StateExplore, "explore"),
+		},
+		api.ScriptStep{
+			ExpectState: api.StateExplore,
+			Decision:    api.NewCallToolDecision("read_file", json.RawMessage(`{}`), "should be denied"),
+		},
+	)
+
+	engine, err := api.New(
+		api.WithRegistry(registry),
+		api.WithPlanner(planner),
+		api.WithToolEligibility(eligibility),
+		api.WithRateLimit(100, 100), // must not drop eligibility middleware
+		api.WithMaxSteps(10),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	_, err = engine.Run(context.Background(), "eligibility with rate limit")
+	if !errors.Is(err, api.ErrToolNotAllowed) {
+		t.Fatalf("expected ErrToolNotAllowed, got %v", err)
 	}
 }
 

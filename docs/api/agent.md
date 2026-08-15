@@ -47,6 +47,10 @@ var (
 
 	// ErrCustomStateDuplicate indicates a custom state with the same name is already registered.
 	ErrCustomStateDuplicate = errors.New("custom state already registered")
+
+	// ErrCustomSideEffectsForbidden indicates a custom state attempted to opt into
+	// side effects. Only the canonical act state may allow side-effecting tools.
+	ErrCustomSideEffectsForbidden = errors.New("custom states cannot allow side effects; only act may")
 )
     Domain errors for the agent runtime.
 
@@ -70,8 +74,8 @@ type CustomState struct {
 	// Name is the stable string identifier for the state.
 	Name State
 
-	// AllowsSideEffects indicates whether tools with side effects may execute
-	// in this state. Only the canonical "act" state allows this by default.
+	// AllowsSideEffects must be false. Only the canonical act state may permit
+	// side-effecting tools; Register rejects true.
 	AllowsSideEffects bool
 
 	// Terminal indicates whether this is a terminal (final) state.
@@ -295,8 +299,8 @@ func (r *StateRegistry) AllStatesIncludingCustom() []State
     AllStatesIncludingCustom returns canonical states plus all custom states.
 
 func (r *StateRegistry) AllowsSideEffects(s State) bool
-    AllowsSideEffects returns true if the state permits side-effect operations,
-    checking both canonical and custom states.
+    AllowsSideEffects returns true only for the canonical act state.
+    Custom states cannot opt into side effects.
 
 func (r *StateRegistry) Get(s State) (CustomState, bool)
     Get returns the custom state definition, or an empty CustomState and false
@@ -312,8 +316,8 @@ func (r *StateRegistry) IsValid(s State) bool
 
 func (r *StateRegistry) Register(cs CustomState) error
     Register adds a custom state to the registry. Returns an error if the state
-    name conflicts with a canonical state or a previously registered custom
-    state.
+    name conflicts with a canonical state, is already registered, or sets
+    AllowsSideEffects (only act may permit side effects).
 
 type TransitionDecision struct {
 	ToState State  `json:"to_state"`

@@ -12,6 +12,9 @@ func TestRegister(t *testing.T) {
 	if p == nil {
 		t.Fatal("Pack() returned nil")
 	}
+	if p.Metadata["status"] != "stub" {
+		t.Fatalf("expected stub metadata, got %q", p.Metadata["status"])
+	}
 	if len(p.Tools) == 0 {
 		t.Fatal("Pack() returned no tools")
 	}

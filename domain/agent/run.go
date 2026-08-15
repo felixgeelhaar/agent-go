@@ -77,11 +77,18 @@ func (r *Run) StartAt(t time.Time) {
 	r.StartTime = t
 }
 
-// TransitionTo changes the current state.
+// TransitionTo changes the current state, stamping terminal end time from the
+// wall clock. The engine drives transitions via the state machine interpreter;
+// TransitionToAt is available for standalone domain use with an injected clock.
 func (r *Run) TransitionTo(state State) {
+	r.TransitionToAt(state, time.Now())
+}
+
+// TransitionToAt changes the current state, stamping terminal end time from t.
+func (r *Run) TransitionToAt(state State, t time.Time) {
 	r.CurrentState = state
 	if state.IsTerminal() {
-		r.EndTime = time.Now()
+		r.EndTime = t
 		if state == StateDone {
 			r.Status = RunStatusCompleted
 		} else {
@@ -90,11 +97,17 @@ func (r *Run) TransitionTo(state State) {
 	}
 }
 
-// Complete marks the run as successfully completed.
+// Complete marks the run as successfully completed, stamping the wall clock.
+// The engine uses CompleteAt with an injected clock for determinism.
 func (r *Run) Complete(result json.RawMessage) {
+	r.CompleteAt(result, time.Now())
+}
+
+// CompleteAt marks the run as successfully completed at the given instant.
+func (r *Run) CompleteAt(result json.RawMessage, t time.Time) {
 	r.Status = RunStatusCompleted
 	r.CurrentState = StateDone
-	r.EndTime = time.Now()
+	r.EndTime = t
 	r.Result = result
 }
 
@@ -181,12 +194,18 @@ func (r *Run) ClearPendingQuestion() {
 	r.PendingQuestion = nil
 }
 
-// AskHuman sets a pending question and pauses the run.
+// AskHuman sets a pending question and pauses the run, stamping AskedAt from
+// the wall clock. The engine uses AskHumanAt with an injected clock.
 func (r *Run) AskHuman(question string, options []string) {
+	r.AskHumanAt(question, options, time.Now())
+}
+
+// AskHumanAt sets a pending question and pauses the run at the given instant.
+func (r *Run) AskHumanAt(question string, options []string, t time.Time) {
 	r.PendingQuestion = &PendingQuestion{
 		Question: question,
 		Options:  options,
-		AskedAt:  time.Now(),
+		AskedAt:  t,
 	}
 	r.Status = RunStatusPaused
 }

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Middleware options (`WithRateLimit`, `WithMiddleware`, etc.) append to the
+  default policy chain instead of replacing eligibility/approval/validation.
+- `ContinueRun` and `ResumeWithInput` share `driveLoop` with loop detection
+  (`ErrNoProgress`) and `ErrMaxSteps`.
+- Schema validation now checks JSON Schema `type`, `required`, and property
+  types (not only `json.Valid`).
+- EventStore/RunStore persistence failures fail the run when strict audit is
+  enabled (default whenever an EventStore is configured); override with
+  `WithStrictAudit`.
+- Stub contrib packs are labeled `[STUB]` with `metadata.status=stub`.
+- `scripts/new-contrib.sh` no longer emits a local `replace` directive.
+- Docs/version alignment: `version.go` → 0.15.0; event/module counts; coverage
+  thresholds documented via `.coverctl.yaml`; CI reusable workflows pinned.
+
+### Changed
+- Evidence / AskHuman / Complete / TransitionTo gain `*At` clock-injected
+  variants used by the engine for deterministic timestamps.
+
+## [0.15.0] - 2026-08-14
+
+### Notes
+- Release line for published contrib module requires (`v0.15.0`).
+- Includes security hardenings, statekit bump, and contrib `replace` removal
+  from prior unreleased work on main.
+
 ## [0.11.0] - 2026-06-20
 
 ### Added

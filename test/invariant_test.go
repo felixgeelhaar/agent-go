@@ -151,18 +151,74 @@ func TestInvariant_ToolEligibility(t *testing.T) {
 // =============================================================================
 
 func TestInvariant_TransitionValidity(t *testing.T) {
-	t.Run("invalid_transition_rejected", func(t *testing.T) {
+	t.Run("invalid_transition_soft_rejected_then_no_progress", func(t *testing.T) {
 		registry := api.NewToolRegistry()
 
 		// Create transitions that don't allow intake -> act
 		transitions := api.NewStateTransitions()
 		transitions.Allow(agent.StateIntake, agent.StateExplore)
 
-		// Create planner that tries invalid transition
+		// Planner that keeps requesting the same invalid transition.
 		scriptedPlanner := api.NewScriptedPlanner(
 			api.ScriptStep{
 				ExpectState: agent.StateIntake,
 				Decision:    api.NewTransitionDecision(agent.StateAct, "skip to act"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateIntake,
+				Decision:    api.NewTransitionDecision(agent.StateAct, "skip to act again"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateIntake,
+				Decision:    api.NewTransitionDecision(agent.StateAct, "skip to act yet again"),
+			},
+		)
+
+		engine, err := api.New(
+			api.WithRegistry(registry),
+			api.WithPlanner(scriptedPlanner),
+			api.WithTransitions(transitions),
+			api.WithMaxSteps(10),
+			api.WithMaxNoProgress(2),
+		)
+		if err != nil {
+			t.Fatalf("failed to create engine: %v", err)
+		}
+
+		ctx := context.Background()
+		run, err := engine.Run(ctx, "test invalid transition")
+
+		// Soft-reject keeps the run in intake; loop detection then aborts.
+		if !errors.Is(err, api.ErrNoProgress) {
+			t.Fatalf("expected ErrNoProgress after soft-rejected transitions, got: %v", err)
+		}
+		if run.CurrentState != agent.StateFailed {
+			t.Errorf("expected failed terminal state, got: %s", run.CurrentState)
+		}
+	})
+
+	t.Run("invalid_transition_leaves_state_unchanged", func(t *testing.T) {
+		registry := api.NewToolRegistry()
+		transitions := api.DefaultTransitions()
+		// Default already allows intake→explore; we only need to prove a
+		// forbidden edge (intake→act) soft-rejects, then recovery succeeds.
+
+		scriptedPlanner := api.NewScriptedPlanner(
+			api.ScriptStep{
+				ExpectState: agent.StateIntake,
+				Decision:    api.NewTransitionDecision(agent.StateAct, "invalid"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateIntake,
+				Decision:    api.NewTransitionDecision(agent.StateExplore, "recover"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateExplore,
+				Decision:    api.NewTransitionDecision(agent.StateDecide, "to decide"),
+			},
+			api.ScriptStep{
+				ExpectState: agent.StateDecide,
+				Decision:    api.NewFinishDecision("done", json.RawMessage(`{}`)),
 			},
 		)
 
@@ -176,11 +232,12 @@ func TestInvariant_TransitionValidity(t *testing.T) {
 			t.Fatalf("failed to create engine: %v", err)
 		}
 
-		ctx := context.Background()
-		_, err = engine.Run(ctx, "test invalid transition")
-
-		if err == nil {
-			t.Fatal("expected error for invalid transition, got nil")
+		run, err := engine.Run(context.Background(), "recover from soft reject")
+		if err != nil {
+			t.Fatalf("run failed: %v", err)
+		}
+		if run.Status != agent.RunStatusCompleted {
+			t.Fatalf("expected completed after recovery, got %s", run.Status)
 		}
 	})
 
@@ -579,6 +636,20 @@ func TestInvariant_StateSemantics(t *testing.T) {
 		}
 		if agent.StateDecide.AllowsSideEffects() {
 			t.Error("decide state should not allow side effects")
+		}
+
+		reg := agent.NewStateRegistry()
+		if err := reg.Register(agent.CustomState{
+			Name:              agent.State("execute"),
+			AllowsSideEffects: true,
+		}); err != agent.ErrCustomSideEffectsForbidden {
+			t.Fatalf("custom side-effect state error = %v, want %v", err, agent.ErrCustomSideEffectsForbidden)
+		}
+		if err := reg.Register(agent.CustomState{Name: agent.State("review")}); err != nil {
+			t.Fatalf("register review: %v", err)
+		}
+		if reg.AllowsSideEffects(agent.State("review")) {
+			t.Error("custom states must not allow side effects")
 		}
 	})
 
@@ -1297,8 +1368,9 @@ func mustCreateEvent(t *testing.T, runID string, eventType event.Type, payload a
 }
 
 // =============================================================================
-// Invariant 12: Ledger Completeness
-// All significant operations are recorded in the ledger for audit purposes.
+// Invariant 12: Audit Completeness
+// Significant operations are recorded in the EventStore (durable audit) and
+// mirrored as run evidence for tool results.
 // =============================================================================
 
 func TestInvariant_LedgerCompleteness(t *testing.T) {
@@ -1320,6 +1392,8 @@ func TestInvariant_LedgerCompleteness(t *testing.T) {
 
 		eligibility := api.NewToolEligibility()
 		eligibility.Allow(agent.StateExplore, "read_file")
+
+		eventStore := memory.NewEventStore()
 
 		// Create scripted planner that calls the tool multiple times
 		scriptedPlanner := api.NewScriptedPlanner(
@@ -1350,6 +1424,7 @@ func TestInvariant_LedgerCompleteness(t *testing.T) {
 			api.WithPlanner(scriptedPlanner),
 			api.WithToolEligibility(eligibility),
 			api.WithTransitions(api.DefaultTransitions()),
+			api.WithEventStore(eventStore),
 			api.WithMaxSteps(20),
 		)
 		if err != nil {
@@ -1365,16 +1440,33 @@ func TestInvariant_LedgerCompleteness(t *testing.T) {
 			t.Fatalf("expected completed, got: %s", run.Status)
 		}
 
-		// Verify evidence contains tool results (which come from ledger recording)
+		// Evidence mirrors successful tool results.
 		toolEvidenceCount := 0
 		for _, e := range run.Evidence {
 			if e.Type == agent.EvidenceToolResult {
 				toolEvidenceCount++
 			}
 		}
-
 		if toolEvidenceCount != 2 {
 			t.Errorf("expected 2 tool evidence items, got: %d", toolEvidenceCount)
+		}
+
+		// Durable audit: EventStore records tool.called and tool.succeeded.
+		events, err := eventStore.LoadEvents(ctx, run.ID)
+		if err != nil {
+			t.Fatalf("load events: %v", err)
+		}
+		called, succeeded := 0, 0
+		for _, ev := range events {
+			switch ev.Type {
+			case event.TypeToolCalled:
+				called++
+			case event.TypeToolSucceeded:
+				succeeded++
+			}
+		}
+		if called != 2 || succeeded != 2 {
+			t.Errorf("expected 2 tool.called and 2 tool.succeeded events, got called=%d succeeded=%d", called, succeeded)
 		}
 	})
 
