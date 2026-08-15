@@ -216,8 +216,6 @@ func TestImageRotate(t *testing.T) {
 		{270, 20, 40},
 	}
 	for _, tc := range cases {
-		outPath := filepath.Join("rot", strings.ReplaceAll(string(rune('0'+tc.degrees/90)), "", "")+".png")
-		_ = outPath
 		name := filepath.Join("rot", "d"+itoa(tc.degrees)+".png")
 		out := execTool(t, getTool(t, baseDir, "image_rotate"), map[string]any{
 			"path": "src.png", "output_path": name, "degrees": tc.degrees,
@@ -349,17 +347,22 @@ func TestImageWatermark(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Corner block should darken pixels near bottom-right relative to original bright gradient.
-	orig := color.RGBA{}
-	_ = orig
-	marked := img.At(45, 45)
-	r, g, b, a := marked.RGBA()
-	if a == 0 {
-		t.Fatal("expected opaque pixel")
+	srcFile, err := os.Open(filepath.Join(baseDir, "src.png"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Original pixel at (45,45) is fairly bright; watermark overlays black so channels should drop.
-	if r>>8 > 250 && g>>8 > 250 && b>>8 > 250 {
-		t.Errorf("expected watermark to darken corner, got rgba %d %d %d", r>>8, g>>8, b>>8)
+	defer srcFile.Close()
+	srcImg, err := png.Decode(srcFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Bottom-right region should be darker than the unmodified source.
+	sr, sg, sb, _ := srcImg.At(45, 45).RGBA()
+	mr, mg, mb, _ := img.At(45, 45).RGBA()
+	if mr >= sr && mg >= sg && mb >= sb {
+		t.Errorf("expected watermark to darken corner; before=%d,%d,%d after=%d,%d,%d",
+			sr>>8, sg>>8, sb>>8, mr>>8, mg>>8, mb>>8)
 	}
 }
 
