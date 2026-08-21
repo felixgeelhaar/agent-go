@@ -3,7 +3,14 @@
 hooks: { pre_commit: true, pre_push: true }
 commands:
   lint: "golangci-lint run ./..."
-  test: "go test -race ./..."
+  # -tags=integration so test/integration/ is compiled and run too. Without
+  # it the build tag excludes the package from every automatic run: the gate
+  # skipped it, the shared CI bar skipped it, and `make test-integration` was
+  # the only way it ever executed — when somebody remembered.
+  #
+  # It needs nothing external (in-memory storage, no network) and takes 0.4s,
+  # so there is no reason for it to be optional.
+  test: "go test -race -tags=integration ./..."
 steps:
   pre_commit: [lint]
   pre_push: [test, lint]
