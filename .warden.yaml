@@ -2,7 +2,7 @@
 # Any dev with warden installed gets the same checks CI runs, pre-commit/pre-push.
 hooks: { pre_commit: true, pre_push: true }
 commands:
-  lint: "golangci-lint run ./..."
+  lint: "golangci-lint run --allow-parallel-runners ./..."
   # -tags=integration so test/integration/ is compiled and run too. Without
   # it the build tag excludes the package from every automatic run: the gate
   # skipped it, the shared CI bar skipped it, and `make test-integration` was
