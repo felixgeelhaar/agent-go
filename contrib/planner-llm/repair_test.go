@@ -161,6 +161,27 @@ func TestPlanDoesNotRepairAGoodAnswer(t *testing.T) {
 	}
 }
 
+// TestRepairEchoesARejectedToolCall covers the one turn that carries no text.
+// A native tool call with unparseable arguments has an empty Content, and
+// echoing "(no content)" would ask the model to correct something invisible.
+func TestRepairEchoesARejectedToolCall(t *testing.T) {
+	t.Parallel()
+	bad := Message{Role: "assistant"}
+	bad.ToolCalls = []ToolCall{{ID: "1", Type: "function"}}
+	bad.ToolCalls[0].Function.Name = "read_logs"
+	bad.ToolCalls[0].Function.Arguments = "{not json"
+
+	msgs := repairMessages([]Message{{Role: "user"}}, bad, ErrInvalidToolArgs)
+
+	echo := msgs[1]
+	if echo.Role != "assistant" {
+		t.Fatalf("echo role = %q, want assistant", echo.Role)
+	}
+	if !strings.Contains(echo.Content, "read_logs") || !strings.Contains(echo.Content, "{not json") {
+		t.Errorf("the rejected tool call must be visible to the model, got %q", echo.Content)
+	}
+}
+
 func TestIsRepairableRejectsAnUnrelatedError(t *testing.T) {
 	t.Parallel()
 	if isRepairable(errors.New("connection reset by peer")) {

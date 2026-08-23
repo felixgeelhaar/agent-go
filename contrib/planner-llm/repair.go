@@ -57,14 +57,32 @@ func isRepairable(err error) bool {
 // The rejected output is echoed back as the assistant turn it actually was.
 // Leaving it out would ask the model to correct something it can no longer see,
 // and models then tend to repeat the mistake verbatim.
-func repairMessages(msgs []Message, said string, err error) []Message {
-	if strings.TrimSpace(said) == "" {
-		said = "(no content)"
+func repairMessages(msgs []Message, said Message, err error) []Message {
+	echo := said
+	echo.Role = "assistant"
+	if strings.TrimSpace(echo.Content) == "" {
+		// A rejected native tool call carries no text, so describing it is the
+		// only way the model can see what it just did. "(no content)" would ask
+		// it to fix something invisible.
+		echo.Content = describeToolCalls(said.ToolCalls)
 	}
 	return append(msgs,
-		Message{Role: "assistant", Content: said},
+		echo,
 		Message{Role: "user", Content: repairInstruction(err)},
 	)
+}
+
+// describeToolCalls renders a tool-call turn as text for the repair echo.
+func describeToolCalls(calls []ToolCall) string {
+	if len(calls) == 0 {
+		return "(no content)"
+	}
+	var b strings.Builder
+	b.WriteString("(tool call)")
+	for _, c := range calls {
+		fmt.Fprintf(&b, " %s(%s)", c.Function.Name, c.Function.Arguments)
+	}
+	return b.String()
 }
 
 // repairInstruction names the defect. A generic "that was invalid, try again"

@@ -229,7 +229,7 @@ func (p *LLMPlanner) Plan(ctx context.Context, req planner.PlanRequest) (agent.D
 		if !isRepairable(lastErr) {
 			return agent.Decision{}, lastErr
 		}
-		messages = repairMessages(messages, resp.Message.Content, lastErr)
+		messages = repairMessages(messages, resp.Message, lastErr)
 	}
 
 	return agent.Decision{}, wrapExhausted(lastErr, p.repairAttempts+1)
