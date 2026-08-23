@@ -125,6 +125,19 @@ type Config struct {
 	// step, so the default is on: the alternative is not a cheaper run, it is a
 	// dead one.
 	RepairAttempts int
+
+	// OnRepair, when set, is called once per re-ask with the attempt number
+	// (1 for the first repair) and the parse error being corrected.
+	//
+	// Without it the repair is silent, and a silent mechanism cannot be known
+	// to work: a caller could not tell a model that never misbehaves from a
+	// repair that fires on every second step, and would learn about the
+	// difference from a token bill. It is also the only place the raw defect
+	// rate is visible — by the time Plan returns, a repaired answer is
+	// indistinguishable from a correct one, which is the point.
+	//
+	// Called synchronously on the planning path, so it must not block.
+	OnRepair func(attempt int, err error)
 }
 
 // LLMPlanner uses an LLM provider to make planning decisions.
@@ -135,6 +148,7 @@ type LLMPlanner struct {
 	maxTokens      int
 	systemPrompt   string
 	repairAttempts int
+	onRepair       func(attempt int, err error)
 }
 
 // NewPlanner creates a new LLM-based planner with the given configuration.
@@ -169,6 +183,7 @@ func NewPlanner(cfg Config) *LLMPlanner {
 		maxTokens:      maxTokens,
 		systemPrompt:   systemPrompt,
 		repairAttempts: repairAttempts,
+		onRepair:       cfg.OnRepair,
 	}
 }
 
@@ -228,6 +243,9 @@ func (p *LLMPlanner) Plan(ctx context.Context, req planner.PlanRequest) (agent.D
 
 		if !isRepairable(lastErr) {
 			return agent.Decision{}, lastErr
+		}
+		if p.onRepair != nil {
+			p.onRepair(attempt+1, lastErr)
 		}
 		messages = repairMessages(messages, resp.Message, lastErr)
 	}
