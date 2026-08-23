@@ -112,15 +112,29 @@ type Config struct {
 
 	// SystemPrompt overrides the default system prompt.
 	SystemPrompt string
+
+	// RepairAttempts bounds how many times the planner re-asks after the model
+	// returns something that is not a usable decision — prose instead of JSON,
+	// a state name in the "decision" field, a fail with no reason.
+	//
+	// Zero selects DefaultRepairAttempts. A negative value disables repair, so
+	// the first malformed answer is returned as the error, which is what a
+	// caller measuring raw model compliance wants.
+	//
+	// A repair only ever runs on a turn that was otherwise about to fail the
+	// step, so the default is on: the alternative is not a cheaper run, it is a
+	// dead one.
+	RepairAttempts int
 }
 
 // LLMPlanner uses an LLM provider to make planning decisions.
 type LLMPlanner struct {
-	provider     Provider
-	model        string
-	temperature  float64
-	maxTokens    int
-	systemPrompt string
+	provider       Provider
+	model          string
+	temperature    float64
+	maxTokens      int
+	systemPrompt   string
+	repairAttempts int
 }
 
 // NewPlanner creates a new LLM-based planner with the given configuration.
@@ -140,12 +154,21 @@ func NewPlanner(cfg Config) *LLMPlanner {
 		systemPrompt = DefaultSystemPrompt
 	}
 
+	repairAttempts := cfg.RepairAttempts
+	switch {
+	case repairAttempts == 0:
+		repairAttempts = DefaultRepairAttempts
+	case repairAttempts < 0:
+		repairAttempts = 0
+	}
+
 	return &LLMPlanner{
-		provider:     cfg.Provider,
-		model:        cfg.Model,
-		temperature:  temperature,
-		maxTokens:    maxTokens,
-		systemPrompt: systemPrompt,
+		provider:       cfg.Provider,
+		model:          cfg.Model,
+		temperature:    temperature,
+		maxTokens:      maxTokens,
+		systemPrompt:   systemPrompt,
+		repairAttempts: repairAttempts,
 	}
 }
 
@@ -169,23 +192,47 @@ func (p *LLMPlanner) Plan(ctx context.Context, req planner.PlanRequest) (agent.D
 		})
 	}
 
-	// Call provider
-	resp, err := p.provider.Complete(ctx, CompletionRequest{
-		Model:       p.model,
-		Messages:    messages,
-		Temperature: p.temperature,
-		MaxTokens:   p.maxTokens,
-		Tools:       tools,
-	})
-	if err != nil {
-		return agent.Decision{}, fmt.Errorf("LLM completion failed: %w", err)
+	// A model that answers in prose, or names a state where a decision belongs,
+	// has produced a step failure out of a turn that was otherwise fine. Ask
+	// again, telling it what was wrong — see repair.go for why that beats more
+	// prompt text.
+	var lastErr error
+	for attempt := 0; attempt <= p.repairAttempts; attempt++ {
+		resp, err := p.provider.Complete(ctx, CompletionRequest{
+			Model:       p.model,
+			Messages:    messages,
+			Temperature: p.temperature,
+			MaxTokens:   p.maxTokens,
+			Tools:       tools,
+		})
+		if err != nil {
+			// A transport or provider failure is not the model's to fix, and
+			// re-asking would only repeat the outage.
+			return agent.Decision{}, fmt.Errorf("LLM completion failed: %w", err)
+		}
+
+		// Native tool calls take priority over text JSON.
+		if len(resp.Message.ToolCalls) > 0 {
+			decision, parseErr := ParseToolCalls(resp.Message.ToolCalls)
+			if parseErr == nil {
+				return decision, nil
+			}
+			lastErr = parseErr
+		} else {
+			decision, parseErr := ParseDecisionJSON(resp.Message.Content)
+			if parseErr == nil {
+				return decision, nil
+			}
+			lastErr = parseErr
+		}
+
+		if !isRepairable(lastErr) {
+			return agent.Decision{}, lastErr
+		}
+		messages = repairMessages(messages, resp.Message.Content, lastErr)
 	}
 
-	// Parse response — native tool calls take priority over text JSON
-	if len(resp.Message.ToolCalls) > 0 {
-		return ParseToolCalls(resp.Message.ToolCalls)
-	}
-	return ParseDecisionJSON(resp.Message.Content)
+	return agent.Decision{}, wrapExhausted(lastErr, p.repairAttempts+1)
 }
 
 // DefaultSystemPrompt is the default system prompt for the agent planner.
