@@ -97,6 +97,89 @@ func TestPlanRepairNamesTheSpecificRule(t *testing.T) {
 	}
 }
 
+// TestOnRepairReportsEveryReAsk covers the observability the repair would
+// otherwise lack. A repaired answer is indistinguishable from a correct one by
+// the time Plan returns — which is the point of the repair and exactly why the
+// caller needs telling it happened.
+func TestOnRepairReportsEveryReAsk(t *testing.T) {
+	t.Parallel()
+	prov := &scriptedProvider{replies: []string{
+		"prose, not a decision",
+		`{"decision":"act"}`,
+		`{"decision":"finish","summary":"done"}`,
+	}}
+
+	type call struct {
+		attempt int
+		err     error
+	}
+	var seen []call
+	p := NewPlanner(Config{
+		Provider:       prov,
+		RepairAttempts: 2,
+		OnRepair:       func(attempt int, err error) { seen = append(seen, call{attempt, err}) },
+	})
+
+	if _, err := planOnce(t, p); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("OnRepair called %d times, want one per re-ask", len(seen))
+	}
+	// The attempt number is what turns a stream of these into a rate.
+	if seen[0].attempt != 1 || seen[1].attempt != 2 {
+		t.Errorf("attempts = %d, %d; want 1, 2", seen[0].attempt, seen[1].attempt)
+	}
+	// The specific defect, not just "a repair happened" — a caller triaging a
+	// model needs to know whether it is emitting prose or naming a state.
+	if !errors.Is(seen[0].err, ErrNoJSON) {
+		t.Errorf("first err = %v, want ErrNoJSON", seen[0].err)
+	}
+	if !errors.Is(seen[1].err, ErrUnknownDecision) {
+		t.Errorf("second err = %v, want ErrUnknownDecision", seen[1].err)
+	}
+}
+
+// TestOnRepairIsSilentOnAGoodAnswer keeps the hook from becoming noise: a
+// caller logging it must be able to read "no line" as "the model complied".
+func TestOnRepairIsSilentOnAGoodAnswer(t *testing.T) {
+	t.Parallel()
+	prov := &scriptedProvider{replies: []string{`{"decision":"finish","summary":"done"}`}}
+
+	called := false
+	p := NewPlanner(Config{
+		Provider: prov,
+		OnRepair: func(int, error) { called = true },
+	})
+
+	if _, err := planOnce(t, p); err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Error("OnRepair fired for an answer that parsed")
+	}
+}
+
+// TestOnRepairIsSilentOnAProviderFailure keeps the hook aimed at the model. A
+// 502 counted as a repair would inflate the defect rate with an outage.
+func TestOnRepairIsSilentOnAProviderFailure(t *testing.T) {
+	t.Parallel()
+	prov := &scriptedProvider{err: errors.New("502 bad gateway")}
+
+	called := false
+	p := NewPlanner(Config{
+		Provider: prov,
+		OnRepair: func(int, error) { called = true },
+	})
+
+	if _, err := planOnce(t, p); err == nil {
+		t.Fatal("want the provider error")
+	}
+	if called {
+		t.Error("a provider error is not a repair")
+	}
+}
+
 // TestPlanGivesUpAfterTheBound stops a stubborn model from looping.
 func TestPlanGivesUpAfterTheBound(t *testing.T) {
 	t.Parallel()
