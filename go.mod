@@ -2,6 +2,8 @@ module go.klarlabs.de/agent
 
 go 1.26.2
 
+toolchain go1.26.7
+
 require (
 	github.com/google/uuid v1.6.0
 	go.klarlabs.de/axi v1.4.0
