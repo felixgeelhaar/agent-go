@@ -1257,8 +1257,37 @@ func (e *Engine) generateRunID() string {
 	return fmt.Sprintf("run-%d-%s", e.clock.Now().UnixNano(), hex.EncodeToString(b))
 }
 
+// expandWildcard turns a state's allow-list into concrete tool names.
+//
+// ToolEligibility.AllowedTools returns the literal "*" for a wildcard state, and
+// its own documentation says callers must check for it. Engine.step did not: it
+// passed ["*"] straight through, buildToolDefs called registry.Get("*"), found
+// nothing, and the planner was handed ZERO tool definitions. Since
+// NewDefaultToolEligibility uses "*" for explore/decide/act/validate, the default
+// configuration gave the planner no visible tools at all — while IsAllowed
+// honoured the wildcard, so execution would have permitted them. Only the
+// planner's view was empty.
+//
+// Expanding against the LIVE registry has a second consequence that is deliberate:
+// a tool registered during a run becomes visible on the next step. That is what a
+// deferred tool surface needs, and it keeps such a tool flowing through the normal
+// eligibility, approval and audit path under its own name rather than behind a
+// proxy.
+//
+// An explicit list is returned untouched — widening a named state to the whole
+// registry would silently grant tools that state was never meant to have.
+func expandWildcard(allowed []string, registered []string) []string {
+	for _, name := range allowed {
+		if name == "*" {
+			return registered
+		}
+	}
+	return allowed
+}
+
 // buildToolDefs converts allowed tool names into ToolDef structs for the planner.
 func (e *Engine) buildToolDefs(allowedTools []string) []domainplanner.ToolDef {
+	allowedTools = expandWildcard(allowedTools, e.registry.Names())
 	defs := make([]domainplanner.ToolDef, 0, len(allowedTools))
 	for _, name := range allowedTools {
 		if t, ok := e.registry.Get(name); ok {
